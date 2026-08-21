@@ -526,10 +526,6 @@ let modalProject = null;
 const APPS_SCRIPT_CODE = `function doGet(e) {
   try {
     var p = e.parameter || {};
-    if (p.action === 'meta') {
-      CacheService.getScriptCache().put('meta_' + p.id, p.data, 600);
-      return jsonOut_({status:'ok'});
-    }
     if (p.action === 'chunk') {
       CacheService.getScriptCache().put('chunk_' + p.id + '_' + p.idx, p.chunk, 600);
       return jsonOut_({status:'ok'});
@@ -582,11 +578,9 @@ function handleFinish_(p) {
     full += cache.get('chunk_' + p.id + '_' + i) || '';
     cache.remove('chunk_' + p.id + '_' + i);
   }
-  var metaStr = cache.get('meta_' + p.id);
-  var data = metaStr ? JSON.parse(metaStr) : { id: p.id };
+  var data = p.data ? JSON.parse(p.data) : { id: p.id };
   data.foto_base64 = full;
   appendCatatan_(data);
-  cache.remove('meta_' + p.id);
   return jsonOut_({status:'ok'});
 }
 
@@ -977,13 +971,10 @@ async function sendPhotoChunks_(scriptUrl, payload){
   delete meta.foto_base64;
   const sep = scriptUrl.includes('?') ? '&' : '?';
 
-  // 1. kirim data teksnya dulu, disimpan sementara di server
-  await sendViaIframe_(scriptUrl + sep + 'action=meta&id=' + encodeURIComponent(id) + '&data=' + encodeURIComponent(JSON.stringify(meta)) + '&_=' + Date.now());
-
-  // 2. potong foto, kirim beberapa potongan SEKALIGUS (paralel) biar cepat
+  // 1. potong foto, kirim beberapa potongan sekaligus (paralel terbatas) biar cepat tapi tetap andal
   const chunkSize = 1500;
   const total = Math.max(1, Math.ceil(foto.length / chunkSize));
-  const CONCURRENCY = 5;
+  const CONCURRENCY = 3;
   showToast('Mengirim foto (0/'+total+')...', 'info');
 
   const queue = Array.from({length: total}, (_, i) => i);
@@ -1002,8 +993,11 @@ async function sendPhotoChunks_(scriptUrl, payload){
   }
   await Promise.all(Array.from({length: Math.min(CONCURRENCY, total)}, worker));
 
-  // 3. semua potongan sudah terkirim, minta server gabungkan jadi 1 foto utuh
-  await sendViaIframe_(scriptUrl + sep + 'action=finish&id=' + encodeURIComponent(id) + '&total=' + total + '&_=' + Date.now());
+  // 2. semua potongan sudah terkirim; kirim data teksnya BARENG di permintaan terakhir ini,
+  //    supaya server bisa gabungkan foto + simpan baris sekaligus tanpa bergantung ke cache tahap sebelumnya
+  const finishUrl = scriptUrl + sep + 'action=finish&id=' + encodeURIComponent(id) + '&total=' + total +
+    '&data=' + encodeURIComponent(JSON.stringify(meta)) + '&_=' + Date.now();
+  await sendViaIframe_(finishUrl);
 
   return 'unknown'; // tidak bisa dikonfirmasi otomatis (batasan CORS), tapi cara ini terbukti sampai ke server
 }
