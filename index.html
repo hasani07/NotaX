@@ -942,15 +942,6 @@ async function sendToScript(scriptUrl, payload){
   }
   const sep = scriptUrl.includes('?') ? '&' : '?';
   const url = scriptUrl + sep + 'data=' + encodeURIComponent(JSON.stringify(payload)) + '&_=' + Date.now();
-  try{
-    const res = await fetch(url, { method:'GET', cache:'no-store' });
-    if(res.ok){
-      try{
-        const json = await res.json();
-        return json.status === 'ok' ? 'ok' : 'error';
-      }catch(e){ return 'ok'; }
-    }
-  }catch(e){ /* lanjut ke fallback iframe */ }
   return await sendViaIframe_(url);
 }
 
@@ -962,23 +953,21 @@ async function sendPhotoChunks_(scriptUrl, payload){
   const sep = scriptUrl.includes('?') ? '&' : '?';
 
   // 1. kirim data teksnya dulu, disimpan sementara di server
-  try{
-    await fetch(scriptUrl + sep + 'action=meta&id=' + encodeURIComponent(id) + '&data=' + encodeURIComponent(JSON.stringify(meta)) + '&_=' + Date.now(), { cache:'no-store' });
-  }catch(e){ /* diabaikan, permintaan tetap terkirim ke server meski dibaca browser gagal */ }
+  await sendViaIframe_(scriptUrl + sep + 'action=meta&id=' + encodeURIComponent(id) + '&data=' + encodeURIComponent(JSON.stringify(meta)) + '&_=' + Date.now());
 
   // 2. potong foto jadi bagian-bagian kecil, kirim satu-satu berurutan
-  const chunkSize = 4000;
+  const chunkSize = 800;
   const total = Math.max(1, Math.ceil(foto.length / chunkSize));
   showToast('Mengirim foto (0/'+total+')...', 'info');
   for(let i=0;i<total;i++){
     const chunk = foto.slice(i*chunkSize, (i+1)*chunkSize);
     const url = scriptUrl + sep + 'action=chunk&id=' + encodeURIComponent(id) + '&idx=' + i + '&total=' + total + '&chunk=' + encodeURIComponent(chunk) + '&_=' + Date.now();
-    try{ await fetch(url, { cache:'no-store' }); }catch(e){ /* tetap lanjut, request tetap terkirim ke server */ }
+    await sendViaIframe_(url);
     if(total > 6 && (i % Math.ceil(total/4) === 0)){
       showToast('Mengirim foto ('+(i+1)+'/'+total+')...', 'info');
     }
   }
-  return 'unknown'; // tidak bisa dikonfirmasi otomatis (batasan CORS), tapi kemungkinan besar berhasil
+  return 'unknown'; // tidak bisa dikonfirmasi otomatis (batasan CORS), tapi cara ini terbukti sampai ke server
 }
 
 function sendViaIframe_(url){
