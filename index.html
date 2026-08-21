@@ -305,7 +305,7 @@
       <div class="name">Nota<span>X</span></div>
       <p>Catat, kelola, dan kontrol setiap pengeluaran proyek dengan mudah.</p>
     </div>
-    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v14-registry</span></div>
+    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v15-full-sync</span></div>
   </div>
 </div>
 
@@ -700,6 +700,8 @@ async function syncFromRegistry_(){
     const json = await readViaIframe_(REGISTRY_URL);
     if(!json || json.status !== 'ok') return;
     let changed = false;
+    const registryProjectNames = new Set((json.projects||[]).map(p=>p.project));
+
     (json.projects || []).forEach(p=>{
       if(!p.project) return;
       if(!DATA.options.project.includes(p.project)){ DATA.options.project.push(p.project); changed = true; }
@@ -709,14 +711,39 @@ async function syncFromRegistry_(){
         changed = true;
       }
     });
+
+    // project yang udah ada di device ini tapi belum kedaftar di pusat -> daftarkan otomatis
+    Object.keys(DATA.projectLinks).forEach(name=>{
+      if(!registryProjectNames.has(name)){
+        const cfg = DATA.projectLinks[name];
+        if(cfg.scriptUrl){ registerToRegistry_(name, cfg.sheetUrl||'', cfg.scriptUrl||''); }
+      }
+    });
+
     if(json.config){
       if(json.config.cloudName && json.config.cloudName !== DATA.cloudName){ DATA.cloudName = json.config.cloudName; changed = true; }
       if(json.config.uploadPreset && json.config.uploadPreset !== DATA.uploadPreset){ DATA.uploadPreset = json.config.uploadPreset; changed = true; }
+      if(json.config.uangList){
+        try{
+          const remoteUang = JSON.parse(json.config.uangList);
+          remoteUang.forEach(u=>{ if(u && !DATA.options.uang.includes(u)){ DATA.options.uang.push(u); changed = true; } });
+        }catch(e){}
+      }
     }
+
+    // pilihan "uang" lokal yang mungkin belum ada di pusat -> daftarkan juga (aman diulang)
+    registerUangList_();
+
     if(changed) await persist();
   }catch(e){
     console.error('gagal sync dari registry', e);
   }
+}
+
+function registerUangList_(){
+  if(!REGISTRY_URL) return;
+  const sep = REGISTRY_URL.includes('?') ? '&' : '?';
+  sendViaIframe_(REGISTRY_URL + sep + 'action=register_config&uangList=' + encodeURIComponent(JSON.stringify(DATA.options.uang)) + '&_=' + Date.now());
 }
 
 function registerToRegistry_(project, sheetUrl, scriptUrl){
@@ -844,6 +871,9 @@ function confirmNewOption(key){
     updateProjectLinkRow();
     openLinkModal();
   }
+  if(key==='uang'){
+    registerUangList_();
+  }
 }
 
 function updateUangDeleteRow(){
@@ -862,6 +892,7 @@ async function deleteUangOption(){
   if(!ok) return;
   DATA.options.uang = DATA.options.uang.filter(u => u !== val);
   await persist();
+  registerUangList_();
   refreshDropdowns();
   document.getElementById('f_uang').value = '';
   updateUangDeleteRow();
