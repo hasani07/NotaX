@@ -279,7 +279,7 @@
       <div class="name">Nota<span>X</span></div>
       <p>Catat, kelola, dan kontrol setiap pengeluaran proyek dengan mudah.</p>
     </div>
-    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v9-split-photo</span></div>
+    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v10-imgbb</span></div>
   </div>
 </div>
 
@@ -466,6 +466,10 @@
       <label>Apps Script Web App URL (untuk kirim data otomatis)</label>
       <input type="url" id="m_scriptUrl" placeholder="https://script.google.com/macros/s/..../exec">
     </div>
+    <div class="field">
+      <label>ImgBB API Key (untuk upload foto bukti nota — berlaku untuk semua project)</label>
+      <input type="text" id="m_imgbbKey" placeholder="tempel API key dari api.imgbb.com di sini">
+    </div>
 
     <div id="modalStatus"></div>
 
@@ -492,7 +496,7 @@
         <li><b>Penting:</b> jangan hapus atau ubah isi kolom <b>ID</b> di spreadsheet — kolom itu dipakai NotaX buat tahu baris mana yang cocok dengan catatan yang mana. Ubah/hapus kolom lain (Beli Apa, Total, dst) aman dan akan ke-sync ke NotaX.</li>
         <li>Sudah pernah deploy sebelumnya (kode versi lama)? Update kode script-nya ke versi ini lagi, lalu <b>Deploy → Manage deployments</b> → klik ikon pensil di deployment yang ada → di "Version" pilih "New version" → klik <b>Deploy</b>. Cara ini bikin URL-nya tetap sama, jadi kamu tidak perlu ganti URL di NotaX lagi.</li>
         <li>Script ini juga otomatis bikin tab <b>"Ringkasan"</b> berisi total belanja per "Pakai Uang" (mis. total Uang Hasani, total Uang PT) + total semuanya, yang selalu update tiap ada nota baru masuk.</li>
-        <li><b>Baru:</b> kalau nota-nya ada foto bukti, sekarang otomatis di-upload ke folder Google Drive (satu folder sama dengan spreadsheet-nya), dan link-nya nempel di kolom <b>"Link Foto Nota"</b>. Saat proses deploy nanti, Google mungkin minta izin tambahan ke Google Drive — klik izinkan, itu dipakai untuk simpan foto-nya.</li>
+        <li><b>Baru:</b> kalau nota-nya ada foto bukti, sekarang otomatis di-upload lewat ImgBB (layanan gratis), dan link-nya nempel di kolom <b>"Link Foto Nota"</b>. Cara dapetin API key: buka <b>api.imgbb.com</b> → klik "Get API Key" → login/daftar pakai email atau Google → copy key yang muncul → tempel ke kolom "ImgBB API Key" di atas. Cukup sekali diisi, berlaku untuk semua project.</li>
         <li>Foto dikirim bertahap (dipecah jadi beberapa bagian kecil), jadi proses simpan nota yang ada fotonya makan waktu beberapa detik lebih lama dari nota tanpa foto. Ini normal.</li>
         <li><b>Penting:</b> pastikan di Deploy → Manage deployments → Edit, kolom <b>"Execute as"</b> diisi <b>"Me"</b> dan <b>"Who has access"</b> diisi <b>"Anyone"</b> (bukan "Anyone with Google account") — kalau salah satu ini beda, permintaan dari NotaX akan ditolak.</li>
       </ol>
@@ -526,70 +530,21 @@ let modalProject = null;
 const APPS_SCRIPT_CODE = `function doGet(e) {
   try {
     var p = e.parameter || {};
-    if (p.action === 'chunk') {
-      CacheService.getScriptCache().put('chunk_' + p.id + '_' + p.idx, p.chunk, 600);
-      return jsonOut_({status:'ok'});
-    }
-    if (p.action === 'update_foto') {
-      return handleUpdateFoto_(p);
-    }
-    if (p.action === 'finish') {
-      return handleFinish_(p);
-    }
     if (p.action === 'read') {
       return renderReadHtml_();
     }
     if (p.action === 'delete') {
       return handleDelete_(p);
     }
-    if (p.action === 'debug') {
-      return jsonOut_({status:'ok', received: p.data, parsed: safeParse_(p.data)});
-    }
     if (p.data) {
       appendCatatan_(JSON.parse(p.data));
       return jsonOut_({status:'ok'});
     }
     updateRingkasan_();
-    return jsonOut_({status:'ok', version:'v4-finish-data', rows: readRows_()});
+    return jsonOut_({status:'ok', version:'v10-imgbb', rows: readRows_()});
   } catch (err) {
     return jsonOut_({status:'error', message: err.toString()});
   }
-}
-
-function doPost(e) {
-  try {
-    var raw = (e.parameter && e.parameter.payload) ? e.parameter.payload : (e.postData ? e.postData.contents : null);
-    var data = JSON.parse(raw);
-    appendCatatan_(data);
-    return jsonOut_({status:'ok'});
-  } catch (err) {
-    return jsonOut_({status:'error', message: err.toString()});
-  }
-}
-
-function handleUpdateFoto_(p) {
-  var cache = CacheService.getScriptCache();
-  var total = Number(p.total);
-  var full = '';
-  for (var i = 0; i < total; i++) {
-    full += cache.get('chunk_' + p.id + '_' + i) || '';
-    cache.remove('chunk_' + p.id + '_' + i);
-  }
-  if (!full) return jsonOut_({status:'error', message:'chunk kosong'});
-  var fotoUrl = simpanFotoKeDrive_(full, p.id);
-  var sheet = getSheet_();
-  var values = sheet.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
-    if (String(values[i][0]) === String(p.id)) {
-      sheet.getRange(i + 1, 8).setValue(fotoUrl); // kolom H = Link Foto Nota
-      break;
-    }
-  }
-  return jsonOut_({status:'ok', fotoUrl: fotoUrl});
-}
-
-function safeParse_(s) {
-  try { return JSON.parse(s); } catch (e) { return 'PARSE_ERROR: ' + e.toString(); }
 }
 
 function handleDelete_(p) {
@@ -612,62 +567,17 @@ function renderReadHtml_() {
   return HtmlService.createHtmlOutput(html);
 }
 
-function handleFinish_(p) {
-  var cache = CacheService.getScriptCache();
-  var total = Number(p.total);
-  var full = '';
-  for (var i = 0; i < total; i++) {
-    full += cache.get('chunk_' + p.id + '_' + i) || '';
-    cache.remove('chunk_' + p.id + '_' + i);
-  }
-  var data = p.data ? JSON.parse(p.data) : { id: p.id };
-  data.foto_base64 = full;
-  appendCatatan_(data);
-  return jsonOut_({status:'ok'});
-}
-
 function appendCatatan_(data) {
   var sheet = getSheet_();
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(['ID','Tanggal','Beli Apa','Total','Pakai Uang','Project','Ada Bukti Nota','Link Foto Nota','Catatan','Waktu Simpan']);
   }
-  var fotoUrl = '';
-  if (data.foto_base64) {
-    fotoUrl = simpanFotoKeDrive_(data.foto_base64, data.id);
-  }
   sheet.appendRow([
     data.id, data.tanggal, data.beli_apa, data.total, data.pakai_uang,
-    data.project, data.ada_bukti_nota, fotoUrl, data.catatan,
+    data.project, data.ada_bukti_nota, data.foto_url || '', data.catatan,
     new Date()
   ]);
   updateRingkasan_();
-}
-
-function simpanFotoKeDrive_(base64DataUrl, id) {
-  try {
-    var parts = base64DataUrl.split(',');
-    var meta = parts[0];
-    var b64 = parts[1];
-    var mime = meta.substring(meta.indexOf(':') + 1, meta.indexOf(';'));
-    var bytes = Utilities.base64Decode(b64);
-    var blob = Utilities.newBlob(bytes, mime, 'nota-' + id + '.jpg');
-    var folder = getOrCreateFotoFolder_();
-    var file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return file.getUrl();
-  } catch (err) {
-    return 'GAGAL_UPLOAD_FOTO';
-  }
-}
-
-function getOrCreateFotoFolder_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var parents = DriveApp.getFileById(ss.getId()).getParents();
-  var parentFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
-  var folderName = 'Foto Nota - ' + ss.getName();
-  var existing = parentFolder.getFoldersByName(folderName);
-  if (existing.hasNext()) return existing.next();
-  return parentFolder.createFolder(folderName);
 }
 
 function readRows_() {
@@ -772,14 +682,14 @@ document.getElementById('fileInput').addEventListener('change', function(e){
   reader.onload = function(ev){
     const img = new Image();
     img.onload = function(){
-      const maxW = 600;
+      const maxW = 1000;
       const scale = Math.min(1, maxW / img.width);
       const canvas = document.createElement('canvas');
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      receiptImage = canvas.toDataURL('image/jpeg', 0.5);
+      receiptImage = canvas.toDataURL('image/jpeg', 0.75);
       document.getElementById('preview').src = receiptImage;
       document.getElementById('preview').style.display='block';
       document.getElementById('dropLabel').style.display='none';
@@ -927,6 +837,7 @@ function openLinkModal(){
   document.getElementById('linkModalTitle').textContent = 'Atur Spreadsheet: ' + proj;
   document.getElementById('m_sheetUrl').value = cfg.sheetUrl || '';
   document.getElementById('m_scriptUrl').value = cfg.scriptUrl || '';
+  document.getElementById('m_imgbbKey').value = DATA.imgbbKey || '';
   document.getElementById('modalStatus').innerHTML = '';
   document.getElementById('linkModal').classList.add('open');
 }
@@ -958,6 +869,7 @@ async function saveLinkModal(){
   if(!modalProject) return;
   const sheetUrl = document.getElementById('m_sheetUrl').value.trim();
   const scriptUrl = document.getElementById('m_scriptUrl').value.trim();
+  DATA.imgbbKey = document.getElementById('m_imgbbKey').value.trim();
   DATA.projectLinks[modalProject] = { sheetUrl, scriptUrl };
   await persist();
   updateProjectLinkRow();
@@ -997,21 +909,23 @@ async function testSendToSheet(){
   }
 }
 
-async function sendPhotoBestEffort_(scriptUrl, id, fotoDataUrl){
-  const sep = scriptUrl.includes('?') ? '&' : '?';
-  const chunkSize = 1500;
-  const total = Math.max(1, Math.ceil(fotoDataUrl.length / chunkSize));
-  showToast('Mencoba kirim foto ke spreadsheet...', 'info');
+async function uploadToImgbb_(fotoDataUrl, apiKey){
   try{
-    for(let i=0;i<total;i++){
-      const chunk = fotoDataUrl.slice(i*chunkSize, (i+1)*chunkSize);
-      const url = scriptUrl + sep + 'action=chunk&id=' + encodeURIComponent(id) + '&idx=' + i + '&total=' + total + '&chunk=' + encodeURIComponent(chunk) + '&_=' + Date.now() + '_' + i;
-      await sendViaIframe_(url);
+    const base64Only = fotoDataUrl.split(',')[1];
+    const formData = new FormData();
+    formData.append('image', base64Only);
+    const res = await fetch('https://api.imgbb.com/1/upload?key=' + encodeURIComponent(apiKey), {
+      method: 'POST',
+      body: formData
+    });
+    const json = await res.json();
+    if(json && json.success && json.data && json.data.url){
+      return json.data.url;
     }
-    await sendViaIframe_(scriptUrl + sep + 'action=update_foto&id=' + encodeURIComponent(id) + '&total=' + total + '&_=' + Date.now());
-    showToast('Foto sudah dicoba dikirim — cek kolom "Link Foto Nota" di spreadsheet.', 'info');
+    return '';
   }catch(e){
-    // best-effort, gagal pun tidak masalah, data teks sudah aman tersimpan
+    console.error('gagal upload ke imgbb', e);
+    return '';
   }
 }
 
@@ -1183,9 +1097,17 @@ async function saveRecord(){
   const cfg = getLinkCfg(project);
   if(cfg.scriptUrl){
     showToast('Tersimpan. Mengirim ke spreadsheet...', 'info');
+
+    let fotoUrl = '';
+    if(rec.hasReceipt && rec.receiptImage && DATA.imgbbKey){
+      showToast('Mengupload foto...', 'info');
+      fotoUrl = await uploadToImgbb_(rec.receiptImage, DATA.imgbbKey);
+    }
+
     const result = await sendToScript(cfg.scriptUrl, {
       id: rec.id, tanggal: rec.date, beli_apa: rec.desc, total: rec.total, pakai_uang: rec.uang,
-      project: rec.project, ada_bukti_nota: rec.hasReceipt?'Ya':'Tidak', catatan: rec.note
+      project: rec.project, ada_bukti_nota: rec.hasReceipt?'Ya':'Tidak', catatan: rec.note,
+      foto_url: fotoUrl
     });
     rec.synced = (result === 'ok' || result === 'unknown');
     if(result === 'ok') showToast('✓ Tersimpan & masuk ke spreadsheet "'+project+'".', 'ok');
@@ -1193,11 +1115,6 @@ async function saveRecord(){
     else showToast('Tersimpan di NotaX, tapi GAGAL kirim ke spreadsheet. Cek link Apps Script-nya.', 'err');
     await persist();
     renderBoard();
-
-    // upaya tambahan: coba kirim foto secara terpisah (tidak mempengaruhi data teks yang sudah tersimpan)
-    if(rec.hasReceipt && rec.receiptImage){
-      sendPhotoBestEffort_(cfg.scriptUrl, rec.id, rec.receiptImage);
-    }
   } else {
     showToast('✓ Tersimpan. Sinkron otomatis belum diatur untuk project ini.', 'ok');
   }
