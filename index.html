@@ -305,7 +305,7 @@
       <div class="name">Nota<span>X</span></div>
       <p>Catat, kelola, dan kontrol setiap pengeluaran proyek dengan mudah.</p>
     </div>
-    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v12-cloudinary-folder</span></div>
+    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v14-registry</span></div>
   </div>
 </div>
 
@@ -552,6 +552,7 @@ const storage = {
 };
 
 let DATA = { records: [], options: { uang: ["Uang Pribadi","Uang PT"], project: [] }, projectLinks: {} };
+const REGISTRY_URL = 'https://script.google.com/macros/s/AKfycbxuNEaeh_MQLm236kQ57KfxBKBIK40cnXLKlEvZ6CranCOOByKUXOJxbiL_rSONE9zK/exec';
 let noReceipt = false;
 let receiptImage = null;
 let modalProject = null;
@@ -681,6 +682,7 @@ async function loadData(){
       }
     });
   }catch(e){ /* first run */ }
+  await syncFromRegistry_();
   refreshDropdowns();
   renderStats();
   renderBoard();
@@ -692,6 +694,40 @@ async function loadData(){
   document.getElementById('todayLabel').textContent = today.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
   syncAllConfiguredProjects(true);
 }
+async function syncFromRegistry_(){
+  if(!REGISTRY_URL) return;
+  try{
+    const json = await readViaIframe_(REGISTRY_URL);
+    if(!json || json.status !== 'ok') return;
+    let changed = false;
+    (json.projects || []).forEach(p=>{
+      if(!p.project) return;
+      if(!DATA.options.project.includes(p.project)){ DATA.options.project.push(p.project); changed = true; }
+      const existing = DATA.projectLinks[p.project] || {};
+      if(existing.sheetUrl !== p.sheetUrl || existing.scriptUrl !== p.scriptUrl){
+        DATA.projectLinks[p.project] = { sheetUrl: p.sheetUrl || existing.sheetUrl || '', scriptUrl: p.scriptUrl || existing.scriptUrl || '' };
+        changed = true;
+      }
+    });
+    if(json.config){
+      if(json.config.cloudName && json.config.cloudName !== DATA.cloudName){ DATA.cloudName = json.config.cloudName; changed = true; }
+      if(json.config.uploadPreset && json.config.uploadPreset !== DATA.uploadPreset){ DATA.uploadPreset = json.config.uploadPreset; changed = true; }
+    }
+    if(changed) await persist();
+  }catch(e){
+    console.error('gagal sync dari registry', e);
+  }
+}
+
+function registerToRegistry_(project, sheetUrl, scriptUrl){
+  if(!REGISTRY_URL) return;
+  const sep = REGISTRY_URL.includes('?') ? '&' : '?';
+  sendViaIframe_(REGISTRY_URL + sep + 'action=register_project&project=' + encodeURIComponent(project) + '&sheetUrl=' + encodeURIComponent(sheetUrl) + '&scriptUrl=' + encodeURIComponent(scriptUrl) + '&_=' + Date.now());
+  if(DATA.cloudName || DATA.uploadPreset){
+    sendViaIframe_(REGISTRY_URL + sep + 'action=register_config&cloudName=' + encodeURIComponent(DATA.cloudName||'') + '&uploadPreset=' + encodeURIComponent(DATA.uploadPreset||'') + '&_=' + (Date.now()+1));
+  }
+}
+
 async function persist(){
   try{ await storage.set('app-data', JSON.stringify(DATA)); }
   catch(e){ console.error('gagal simpan', e); showToast('Gagal menyimpan data lokal.', 'err'); }
@@ -906,6 +942,7 @@ async function saveLinkModal(){
   updateProjectLinkRow();
   closeLinkModal();
   showToast('Pengaturan spreadsheet untuk "'+modalProject+'" disimpan.', 'ok');
+  registerToRegistry_(modalProject, sheetUrl, scriptUrl);
 }
 function copyScriptCode(){
   navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(()=>{
@@ -1042,18 +1079,32 @@ async function syncProjectFromSheet(project){
     if(DATA.records.length !== before) changed = true;
 
     sheetRows.forEach(row=>{
-      const local = DATA.records.find(r=>r.id === row.id);
-      if(!local) return;
+      let local = DATA.records.find(r=>r.id === row.id);
       const newTotal = Number(row.total)||0;
-      const newDate = formatSheetDate_(row.tanggal) || local.date;
       const newDesc = row.beli_apa || '';
-      const newUang = row.pakai_uang || local.uang;
+      const newUang = row.pakai_uang || (local ? local.uang : '');
       const newNote = row.catatan || '';
-      if(local.desc!==newDesc || local.total!==newTotal || local.uang!==newUang || local.note!==newNote || local.date!==newDate){
+      const newDate = formatSheetDate_(row.tanggal) || (local ? local.date : '');
+      const newFotoUrl = row.foto_url || '';
+
+      if(!local){
+        // baris ada di spreadsheet tapi belum ada di device ini -> tarik masuk sebagai catatan baru
+        local = {
+          id: row.id, date: newDate, desc: newDesc, total: newTotal, uang: newUang,
+          project: project, note: newNote,
+          hasReceipt: row.ada_bukti_nota === 'Ya',
+          receiptImage: null, fotoUrl: newFotoUrl,
+          synced: true, createdAt: Date.now()
+        };
+        DATA.records.unshift(local);
+        changed = true;
+      } else if(local.desc!==newDesc || local.total!==newTotal || local.uang!==newUang || local.note!==newNote || local.date!==newDate || local.fotoUrl!==newFotoUrl){
         local.desc = newDesc; local.total = newTotal; local.uang = newUang;
-        local.note = newNote; local.date = newDate;
+        local.note = newNote; local.date = newDate; local.fotoUrl = newFotoUrl;
         changed = true;
       }
+
+      if(newUang && !DATA.options.uang.includes(newUang)){ DATA.options.uang.push(newUang); changed = true; }
     });
 
     if(changed) await persist();
@@ -1135,6 +1186,8 @@ async function saveRecord(){
     if(rec.hasReceipt && rec.receiptImage && DATA.cloudName && DATA.uploadPreset){
       showToast('Mengupload foto...', 'info');
       fotoUrl = await uploadToCloudinary_(rec.receiptImage, DATA.cloudName, DATA.uploadPreset, rec.project);
+      rec.fotoUrl = fotoUrl;
+      await persist();
     }
 
     const result = await sendToScript(cfg.scriptUrl, {
@@ -1214,7 +1267,9 @@ function renderBoard(){
         </div>
         <div class="item-amt">${fmtRp(r.total)}</div>
       </div>
-      ${r.hasReceipt && r.receiptImage ? `<img class="item-thumb" src="${r.receiptImage}" onclick="openLightbox('${r.receiptImage}')">` : `<div class="no-receipt">🚫 Tidak ada bukti nota</div>`}
+      ${r.hasReceipt && r.receiptImage ? `<img class="item-thumb" src="${r.receiptImage}" onclick="openLightbox('${r.receiptImage}')">`
+        : (r.hasReceipt && r.fotoUrl ? `<img class="item-thumb" src="${r.fotoUrl}" onclick="openLightbox('${r.fotoUrl}')">`
+        : `<div class="no-receipt">🚫 Tidak ada bukti nota</div>`)}
       ${r.note ? `<div class="item-note">${escapeHtml(r.note)}</div>` : ''}
       <div class="badges">
         <span class="badge uang">${escapeHtml(r.uang)}</span>
