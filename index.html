@@ -279,7 +279,7 @@
       <div class="name">Nota<span>X</span></div>
       <p>Catat, kelola, dan kontrol setiap pengeluaran proyek dengan mudah.</p>
     </div>
-    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v7-small-photo</span></div>
+    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v9-split-photo</span></div>
   </div>
 </div>
 
@@ -530,6 +530,9 @@ const APPS_SCRIPT_CODE = `function doGet(e) {
       CacheService.getScriptCache().put('chunk_' + p.id + '_' + p.idx, p.chunk, 600);
       return jsonOut_({status:'ok'});
     }
+    if (p.action === 'update_foto') {
+      return handleUpdateFoto_(p);
+    }
     if (p.action === 'finish') {
       return handleFinish_(p);
     }
@@ -562,6 +565,27 @@ function doPost(e) {
   } catch (err) {
     return jsonOut_({status:'error', message: err.toString()});
   }
+}
+
+function handleUpdateFoto_(p) {
+  var cache = CacheService.getScriptCache();
+  var total = Number(p.total);
+  var full = '';
+  for (var i = 0; i < total; i++) {
+    full += cache.get('chunk_' + p.id + '_' + i) || '';
+    cache.remove('chunk_' + p.id + '_' + i);
+  }
+  if (!full) return jsonOut_({status:'error', message:'chunk kosong'});
+  var fotoUrl = simpanFotoKeDrive_(full, p.id);
+  var sheet = getSheet_();
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === String(p.id)) {
+      sheet.getRange(i + 1, 8).setValue(fotoUrl); // kolom H = Link Foto Nota
+      break;
+    }
+  }
+  return jsonOut_({status:'ok', fotoUrl: fotoUrl});
 }
 
 function safeParse_(s) {
@@ -748,14 +772,14 @@ document.getElementById('fileInput').addEventListener('change', function(e){
   reader.onload = function(ev){
     const img = new Image();
     img.onload = function(){
-      const maxW = 380;
+      const maxW = 600;
       const scale = Math.min(1, maxW / img.width);
       const canvas = document.createElement('canvas');
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      receiptImage = canvas.toDataURL('image/jpeg', 0.4);
+      receiptImage = canvas.toDataURL('image/jpeg', 0.5);
       document.getElementById('preview').src = receiptImage;
       document.getElementById('preview').style.display='block';
       document.getElementById('dropLabel').style.display='none';
@@ -973,6 +997,24 @@ async function testSendToSheet(){
   }
 }
 
+async function sendPhotoBestEffort_(scriptUrl, id, fotoDataUrl){
+  const sep = scriptUrl.includes('?') ? '&' : '?';
+  const chunkSize = 1500;
+  const total = Math.max(1, Math.ceil(fotoDataUrl.length / chunkSize));
+  showToast('Mencoba kirim foto ke spreadsheet...', 'info');
+  try{
+    for(let i=0;i<total;i++){
+      const chunk = fotoDataUrl.slice(i*chunkSize, (i+1)*chunkSize);
+      const url = scriptUrl + sep + 'action=chunk&id=' + encodeURIComponent(id) + '&idx=' + i + '&total=' + total + '&chunk=' + encodeURIComponent(chunk) + '&_=' + Date.now() + '_' + i;
+      await sendViaIframe_(url);
+    }
+    await sendViaIframe_(scriptUrl + sep + 'action=update_foto&id=' + encodeURIComponent(id) + '&total=' + total + '&_=' + Date.now());
+    showToast('Foto sudah dicoba dikirim — cek kolom "Link Foto Nota" di spreadsheet.', 'info');
+  }catch(e){
+    // best-effort, gagal pun tidak masalah, data teks sudah aman tersimpan
+  }
+}
+
 async function sendToScript(scriptUrl, payload){
   const sep = scriptUrl.includes('?') ? '&' : '?';
   const url = scriptUrl + sep + 'data=' + encodeURIComponent(JSON.stringify(payload)) + '&_=' + Date.now();
@@ -1143,8 +1185,7 @@ async function saveRecord(){
     showToast('Tersimpan. Mengirim ke spreadsheet...', 'info');
     const result = await sendToScript(cfg.scriptUrl, {
       id: rec.id, tanggal: rec.date, beli_apa: rec.desc, total: rec.total, pakai_uang: rec.uang,
-      project: rec.project, ada_bukti_nota: rec.hasReceipt?'Ya':'Tidak', catatan: rec.note,
-      foto_base64: (rec.hasReceipt && rec.receiptImage) ? rec.receiptImage : ''
+      project: rec.project, ada_bukti_nota: rec.hasReceipt?'Ya':'Tidak', catatan: rec.note
     });
     rec.synced = (result === 'ok' || result === 'unknown');
     if(result === 'ok') showToast('✓ Tersimpan & masuk ke spreadsheet "'+project+'".', 'ok');
@@ -1152,6 +1193,11 @@ async function saveRecord(){
     else showToast('Tersimpan di NotaX, tapi GAGAL kirim ke spreadsheet. Cek link Apps Script-nya.', 'err');
     await persist();
     renderBoard();
+
+    // upaya tambahan: coba kirim foto secara terpisah (tidak mempengaruhi data teks yang sudah tersimpan)
+    if(rec.hasReceipt && rec.receiptImage){
+      sendPhotoBestEffort_(cfg.scriptUrl, rec.id, rec.receiptImage);
+    }
   } else {
     showToast('✓ Tersimpan. Sinkron otomatis belum diatur untuk project ini.', 'ok');
   }
