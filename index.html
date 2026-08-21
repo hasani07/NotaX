@@ -537,6 +537,9 @@ const APPS_SCRIPT_CODE = `function doGet(e) {
     if (p.action === 'finish') {
       return handleFinish_(p);
     }
+    if (p.action === 'read') {
+      return renderReadHtml_();
+    }
     if (p.data) {
       appendCatatan_(JSON.parse(p.data));
       return jsonOut_({status:'ok'});
@@ -546,6 +549,13 @@ const APPS_SCRIPT_CODE = `function doGet(e) {
   } catch (err) {
     return jsonOut_({status:'error', message: err.toString()});
   }
+}
+
+function renderReadHtml_() {
+  updateRingkasan_();
+  var payload = JSON.stringify({status:'ok', rows: readRows_()});
+  var html = '<script>window.parent.postMessage(' + payload + ', "*");<' + '/script>';
+  return HtmlService.createHtmlOutput(html);
 }
 
 function handleFinish_(p) {
@@ -1008,14 +1018,40 @@ function formatSheetDate_(v){
   return '';
 }
 
+function readViaIframe_(scriptUrl){
+  return new Promise((resolve)=>{
+    const sep = scriptUrl.includes('?') ? '&' : '?';
+    const url = scriptUrl + sep + 'action=read&_=' + Date.now();
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    let done = false;
+    function handler(event){
+      if(done) return;
+      if(!event.data || typeof event.data !== 'object' || !('status' in event.data)) return;
+      done = true;
+      window.removeEventListener('message', handler);
+      setTimeout(()=>{ if(iframe.parentNode) iframe.remove(); }, 300);
+      resolve(event.data);
+    }
+    window.addEventListener('message', handler);
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    setTimeout(()=>{
+      if(done) return;
+      done = true;
+      window.removeEventListener('message', handler);
+      if(iframe.parentNode) iframe.remove();
+      resolve(null);
+    }, 10000);
+  });
+}
+
 async function syncProjectFromSheet(project){
   const cfg = getLinkCfg(project);
   if(!cfg.scriptUrl) return {status:'no-config'};
   try{
-    const res = await fetch(cfg.scriptUrl, { method:'GET' });
-    if(!res.ok) return {status:'error'};
-    const json = await res.json();
-    if(json.status !== 'ok') return {status:'error'};
+    const json = await readViaIframe_(cfg.scriptUrl);
+    if(!json || json.status !== 'ok') return {status:'error'};
     const sheetRows = json.rows || [];
     const sheetIds = new Set(sheetRows.map(r=>r.id));
     let changed = false;
