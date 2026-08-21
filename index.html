@@ -539,15 +539,22 @@ const APPS_SCRIPT_CODE = `function doGet(e) {
     if (p.action === 'delete') {
       return handleDelete_(p);
     }
+    if (p.action === 'debug') {
+      return jsonOut_({status:'ok', received: p.data, parsed: safeParse_(p.data)});
+    }
     if (p.data) {
       appendCatatan_(JSON.parse(p.data));
       return jsonOut_({status:'ok'});
     }
     updateRingkasan_();
-    return jsonOut_({status:'ok', rows: readRows_()});
+    return jsonOut_({status:'ok', version:'v4-finish-data', rows: readRows_()});
   } catch (err) {
     return jsonOut_({status:'error', message: err.toString()});
   }
+}
+
+function safeParse_(s) {
+  try { return JSON.parse(s); } catch (e) { return 'PARSE_ERROR: ' + e.toString(); }
 }
 
 function handleDelete_(p) {
