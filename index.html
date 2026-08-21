@@ -279,7 +279,7 @@
       <div class="name">Nota<span>X</span></div>
       <p>Catat, kelola, dan kontrol setiap pengeluaran proyek dengan mudah.</p>
     </div>
-    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v10-imgbb</span></div>
+    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v12-cloudinary-folder</span></div>
   </div>
 </div>
 
@@ -467,8 +467,12 @@
       <input type="url" id="m_scriptUrl" placeholder="https://script.google.com/macros/s/..../exec">
     </div>
     <div class="field">
-      <label>ImgBB API Key (untuk upload foto bukti nota — berlaku untuk semua project)</label>
-      <input type="text" id="m_imgbbKey" placeholder="tempel API key dari api.imgbb.com di sini">
+      <label>Cloudinary Cloud Name (untuk upload foto — berlaku untuk semua project)</label>
+      <input type="text" id="m_cloudName" placeholder="mis. dxyz1234a">
+    </div>
+    <div class="field">
+      <label>Cloudinary Upload Preset (unsigned)</label>
+      <input type="text" id="m_uploadPreset" placeholder="mis. notax_unsigned">
     </div>
 
     <div id="modalStatus"></div>
@@ -496,7 +500,7 @@
         <li><b>Penting:</b> jangan hapus atau ubah isi kolom <b>ID</b> di spreadsheet — kolom itu dipakai NotaX buat tahu baris mana yang cocok dengan catatan yang mana. Ubah/hapus kolom lain (Beli Apa, Total, dst) aman dan akan ke-sync ke NotaX.</li>
         <li>Sudah pernah deploy sebelumnya (kode versi lama)? Update kode script-nya ke versi ini lagi, lalu <b>Deploy → Manage deployments</b> → klik ikon pensil di deployment yang ada → di "Version" pilih "New version" → klik <b>Deploy</b>. Cara ini bikin URL-nya tetap sama, jadi kamu tidak perlu ganti URL di NotaX lagi.</li>
         <li>Script ini juga otomatis bikin tab <b>"Ringkasan"</b> berisi total belanja per "Pakai Uang" (mis. total Uang Hasani, total Uang PT) + total semuanya, yang selalu update tiap ada nota baru masuk.</li>
-        <li><b>Baru:</b> kalau nota-nya ada foto bukti, sekarang otomatis di-upload lewat ImgBB (layanan gratis), dan link-nya nempel di kolom <b>"Link Foto Nota"</b>. Cara dapetin API key: buka <b>api.imgbb.com</b> → klik "Get API Key" → login/daftar pakai email atau Google → copy key yang muncul → tempel ke kolom "ImgBB API Key" di atas. Cukup sekali diisi, berlaku untuk semua project.</li>
+        <li><b>Baru:</b> kalau nota-nya ada foto bukti, sekarang otomatis di-upload lewat Cloudinary, dan link-nya nempel di kolom <b>"Link Foto Nota"</b> (langsung tampil sebagai preview gambar di spreadsheet). Cara setup Cloudinary (sekali aja): (1) Daftar gratis di <b>cloudinary.com</b>. (2) Di Dashboard, catat <b>Cloud Name</b> kamu (kelihatan di halaman utama). (3) Buka <b>Settings → Upload</b>, scroll ke "Upload presets", klik <b>Add upload preset</b>. (4) Set <b>Signing Mode</b> jadi <b>Unsigned</b>, kasih nama preset bebas (misal "notax_unsigned"), Save. (5) Tempel Cloud Name dan nama preset itu ke dua kolom di atas.</li>
         <li>Foto dikirim bertahap (dipecah jadi beberapa bagian kecil), jadi proses simpan nota yang ada fotonya makan waktu beberapa detik lebih lama dari nota tanpa foto. Ini normal.</li>
         <li><b>Penting:</b> pastikan di Deploy → Manage deployments → Edit, kolom <b>"Execute as"</b> diisi <b>"Me"</b> dan <b>"Who has access"</b> diisi <b>"Anyone"</b> (bukan "Anyone with Google account") — kalau salah satu ini beda, permintaan dari NotaX akan ditolak.</li>
       </ol>
@@ -574,9 +578,16 @@ function appendCatatan_(data) {
   }
   sheet.appendRow([
     data.id, data.tanggal, data.beli_apa, data.total, data.pakai_uang,
-    data.project, data.ada_bukti_nota, data.foto_url || '', data.catatan,
+    data.project, data.ada_bukti_nota, '', data.catatan,
     new Date()
   ]);
+  var lastRow = sheet.getLastRow();
+  if (data.foto_url) {
+    var cell = sheet.getRange(lastRow, 8);
+    cell.setFormula('=IMAGE("' + data.foto_url + '")');
+    cell.setNote(data.foto_url); // link asli tetap tersimpan, muncul saat cell di-hover
+    sheet.setRowHeight(lastRow, 90);
+  }
   updateRingkasan_();
 }
 
@@ -837,7 +848,8 @@ function openLinkModal(){
   document.getElementById('linkModalTitle').textContent = 'Atur Spreadsheet: ' + proj;
   document.getElementById('m_sheetUrl').value = cfg.sheetUrl || '';
   document.getElementById('m_scriptUrl').value = cfg.scriptUrl || '';
-  document.getElementById('m_imgbbKey').value = DATA.imgbbKey || '';
+  document.getElementById('m_cloudName').value = DATA.cloudName || '';
+  document.getElementById('m_uploadPreset').value = DATA.uploadPreset || '';
   document.getElementById('modalStatus').innerHTML = '';
   document.getElementById('linkModal').classList.add('open');
 }
@@ -869,7 +881,8 @@ async function saveLinkModal(){
   if(!modalProject) return;
   const sheetUrl = document.getElementById('m_sheetUrl').value.trim();
   const scriptUrl = document.getElementById('m_scriptUrl').value.trim();
-  DATA.imgbbKey = document.getElementById('m_imgbbKey').value.trim();
+  DATA.cloudName = document.getElementById('m_cloudName').value.trim();
+  DATA.uploadPreset = document.getElementById('m_uploadPreset').value.trim();
   DATA.projectLinks[modalProject] = { sheetUrl, scriptUrl };
   await persist();
   updateProjectLinkRow();
@@ -909,22 +922,24 @@ async function testSendToSheet(){
   }
 }
 
-async function uploadToImgbb_(fotoDataUrl, apiKey){
+async function uploadToCloudinary_(fotoDataUrl, cloudName, uploadPreset, projectName){
   try{
-    const base64Only = fotoDataUrl.split(',')[1];
     const formData = new FormData();
-    formData.append('image', base64Only);
-    const res = await fetch('https://api.imgbb.com/1/upload?key=' + encodeURIComponent(apiKey), {
+    formData.append('file', fotoDataUrl);
+    formData.append('upload_preset', uploadPreset);
+    formData.append('folder', 'notax/' + (projectName || 'lainnya'));
+    const res = await fetch('https://api.cloudinary.com/v1_1/' + encodeURIComponent(cloudName) + '/image/upload', {
       method: 'POST',
       body: formData
     });
     const json = await res.json();
-    if(json && json.success && json.data && json.data.url){
-      return json.data.url;
+    if(json && json.secure_url){
+      return json.secure_url;
     }
+    console.error('gagal upload cloudinary', json);
     return '';
   }catch(e){
-    console.error('gagal upload ke imgbb', e);
+    console.error('gagal upload ke cloudinary', e);
     return '';
   }
 }
@@ -1099,9 +1114,9 @@ async function saveRecord(){
     showToast('Tersimpan. Mengirim ke spreadsheet...', 'info');
 
     let fotoUrl = '';
-    if(rec.hasReceipt && rec.receiptImage && DATA.imgbbKey){
+    if(rec.hasReceipt && rec.receiptImage && DATA.cloudName && DATA.uploadPreset){
       showToast('Mengupload foto...', 'info');
-      fotoUrl = await uploadToImgbb_(rec.receiptImage, DATA.imgbbKey);
+      fotoUrl = await uploadToCloudinary_(rec.receiptImage, DATA.cloudName, DATA.uploadPreset, rec.project);
     }
 
     const result = await sendToScript(cfg.scriptUrl, {
