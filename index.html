@@ -531,7 +531,11 @@ const APPS_SCRIPT_CODE = `function doGet(e) {
       return jsonOut_({status:'ok'});
     }
     if (p.action === 'chunk') {
-      return handleChunk_(p);
+      CacheService.getScriptCache().put('chunk_' + p.id + '_' + p.idx, p.chunk, 600);
+      return jsonOut_({status:'ok'});
+    }
+    if (p.action === 'finish') {
+      return handleFinish_(p);
     }
     if (p.data) {
       appendCatatan_(JSON.parse(p.data));
@@ -544,25 +548,20 @@ const APPS_SCRIPT_CODE = `function doGet(e) {
   }
 }
 
-function handleChunk_(p) {
+function handleFinish_(p) {
   var cache = CacheService.getScriptCache();
-  var idx = Number(p.idx);
   var total = Number(p.total);
-  cache.put('chunk_' + p.id + '_' + idx, p.chunk, 600);
-  if (idx === total - 1) {
-    var full = '';
-    for (var i = 0; i < total; i++) {
-      full += cache.get('chunk_' + p.id + '_' + i) || '';
-      cache.remove('chunk_' + p.id + '_' + i);
-    }
-    var metaStr = cache.get('meta_' + p.id);
-    var data = metaStr ? JSON.parse(metaStr) : { id: p.id };
-    data.foto_base64 = full;
-    appendCatatan_(data);
-    cache.remove('meta_' + p.id);
-    return jsonOut_({status:'ok', done:true});
+  var full = '';
+  for (var i = 0; i < total; i++) {
+    full += cache.get('chunk_' + p.id + '_' + i) || '';
+    cache.remove('chunk_' + p.id + '_' + i);
   }
-  return jsonOut_({status:'ok', done:false});
+  var metaStr = cache.get('meta_' + p.id);
+  var data = metaStr ? JSON.parse(metaStr) : { id: p.id };
+  data.foto_base64 = full;
+  appendCatatan_(data);
+  cache.remove('meta_' + p.id);
+  return jsonOut_({status:'ok'});
 }
 
 function appendCatatan_(data) {
@@ -955,18 +954,31 @@ async function sendPhotoChunks_(scriptUrl, payload){
   // 1. kirim data teksnya dulu, disimpan sementara di server
   await sendViaIframe_(scriptUrl + sep + 'action=meta&id=' + encodeURIComponent(id) + '&data=' + encodeURIComponent(JSON.stringify(meta)) + '&_=' + Date.now());
 
-  // 2. potong foto jadi bagian-bagian kecil, kirim satu-satu berurutan
-  const chunkSize = 800;
+  // 2. potong foto, kirim beberapa potongan SEKALIGUS (paralel) biar cepat
+  const chunkSize = 1500;
   const total = Math.max(1, Math.ceil(foto.length / chunkSize));
+  const CONCURRENCY = 5;
   showToast('Mengirim foto (0/'+total+')...', 'info');
-  for(let i=0;i<total;i++){
-    const chunk = foto.slice(i*chunkSize, (i+1)*chunkSize);
-    const url = scriptUrl + sep + 'action=chunk&id=' + encodeURIComponent(id) + '&idx=' + i + '&total=' + total + '&chunk=' + encodeURIComponent(chunk) + '&_=' + Date.now();
-    await sendViaIframe_(url);
-    if(total > 6 && (i % Math.ceil(total/4) === 0)){
-      showToast('Mengirim foto ('+(i+1)+'/'+total+')...', 'info');
+
+  const queue = Array.from({length: total}, (_, i) => i);
+  let sentCount = 0;
+  async function worker(){
+    while(queue.length){
+      const i = queue.shift();
+      const chunk = foto.slice(i*chunkSize, (i+1)*chunkSize);
+      const url = scriptUrl + sep + 'action=chunk&id=' + encodeURIComponent(id) + '&idx=' + i + '&total=' + total + '&chunk=' + encodeURIComponent(chunk) + '&_=' + Date.now() + i;
+      await sendViaIframe_(url);
+      sentCount++;
+      if(total > 8 && sentCount % Math.ceil(total/4) === 0){
+        showToast('Mengirim foto ('+sentCount+'/'+total+')...', 'info');
+      }
     }
   }
+  await Promise.all(Array.from({length: Math.min(CONCURRENCY, total)}, worker));
+
+  // 3. semua potongan sudah terkirim, minta server gabungkan jadi 1 foto utuh
+  await sendViaIframe_(scriptUrl + sep + 'action=finish&id=' + encodeURIComponent(id) + '&total=' + total + '&_=' + Date.now());
+
   return 'unknown'; // tidak bisa dikonfirmasi otomatis (batasan CORS), tapi cara ini terbukti sampai ke server
 }
 
