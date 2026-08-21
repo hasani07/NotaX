@@ -305,7 +305,7 @@
       <div class="name">Nota<span>X</span></div>
       <p>Catat, kelola, dan kontrol setiap pengeluaran proyek dengan mudah.</p>
     </div>
-    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v15-full-sync</span></div>
+    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v16-firebase</span></div>
   </div>
 </div>
 
@@ -365,7 +365,7 @@
 
       <div class="field">
         <label>Bukti nota</label>
-        <div class="drop" id="dropZone" onclick="if(!noReceipt) document.getElementById('fileInput').click()">
+        <div class="drop" id="dropZone" onclick="window.handleDropZoneClick()">
           <div id="dropLabel">
             <svg class="icon-lg drop-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;display:block;"><path d="M4 14.9A5 5 0 0 1 6 5.3 6 6 0 0 1 17.4 8H18a4 4 0 0 1 1 7.9"/><path d="M12 12v9"/><path d="m8 16 4-4 4 4"/></svg>
             Klik untuk upload foto nota
@@ -451,10 +451,6 @@
         <div class="board-filters">
           <select id="filterUang" onchange="renderBoard()"><option value="">Semua sumber uang</option></select>
           <select id="filterProject" onchange="renderBoard()"><option value="">Semua project</option></select>
-          <button class="btn btn-ghost btn-sm" id="syncBtn" onclick="syncAllConfiguredProjects(false)">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-            Sync dari Spreadsheet
-          </button>
           <button class="btn btn-ghost btn-sm" id="sheetBtn" onclick="handleSheetBtn()">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.5-1.5"/></svg>
             Buka Spreadsheet
@@ -538,21 +534,22 @@
 <div class="toast-wrap" id="toastWrap"></div>
 
 <script>
-// Penyimpanan pakai localStorage bawaan browser, supaya app ini jalan di hosting mana pun
-// (Vercel, domain sendiri, dst), tidak bergantung ke fitur khusus Claude.ai.
-const storage = {
-  async get(key){
-    const v = localStorage.getItem(key);
-    return v === null ? null : { key, value: v };
-  },
-  async set(key, value){
-    localStorage.setItem(key, value);
-    return { key, value };
-  }
-};
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-let DATA = { records: [], options: { uang: ["Uang Pribadi","Uang PT"], project: [] }, projectLinks: {} };
-const REGISTRY_URL = 'https://script.google.com/macros/s/AKfycbxuNEaeh_MQLm236kQ57KfxBKBIK40cnXLKlEvZ6CranCOOByKUXOJxbiL_rSONE9zK/exec';
+const firebaseConfig = {
+  apiKey: "AIzaSyCgkGYR5WrLgWcprju1Vbrd6wD3uLYrUvY",
+  authDomain: "notax-964ae.firebaseapp.com",
+  projectId: "notax-964ae",
+  storageBucket: "notax-964ae.firebasestorage.app",
+  messagingSenderId: "771699854922",
+  appId: "1:771699854922:web:6513b244492a66fdfce0b3"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
+let DATA = { records: [], options: { uang: ["Uang Pribadi","Uang PT"], project: [] }, projectLinks: {}, cloudName: '', uploadPreset: '' };
 let noReceipt = false;
 let receiptImage = null;
 let modalProject = null;
@@ -571,7 +568,7 @@ const APPS_SCRIPT_CODE = `function doGet(e) {
       return jsonOut_({status:'ok'});
     }
     updateRingkasan_();
-    return jsonOut_({status:'ok', version:'v10-imgbb', rows: readRows_()});
+    return jsonOut_({status:'ok', rows: readRows_()});
   } catch (err) {
     return jsonOut_({status:'error', message: err.toString()});
   }
@@ -616,17 +613,10 @@ function readRows_() {
   var rows = [];
   for (var i = 1; i < values.length; i++) {
     var row = values[i];
-    if (!row[0]) continue; // lewati baris tanpa ID (ditambah manual tanpa lewat NotaX)
+    if (!row[0]) continue;
     rows.push({
-      id: String(row[0]),
-      tanggal: row[1],
-      beli_apa: row[2],
-      total: row[3],
-      pakai_uang: row[4],
-      project: row[5],
-      ada_bukti_nota: row[6],
-      foto_url: row[7],
-      catatan: row[8]
+      id: String(row[0]), tanggal: row[1], beli_apa: row[2], total: row[3],
+      pakai_uang: row[4], project: row[5], ada_bukti_nota: row[6], foto_url: row[7], catatan: row[8]
     });
   }
   return rows;
@@ -640,7 +630,7 @@ function updateRingkasan_() {
   var grandTotal = 0;
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
-    if (!row[0]) continue; // lewati baris tanpa ID
+    if (!row[0]) continue;
     var uang = row[4] || '(tidak diisi)';
     var total = Number(row[3]) || 0;
     totals[uang] = (totals[uang] || 0) + total;
@@ -650,9 +640,7 @@ function updateRingkasan_() {
   if (!ring) ring = ss.insertSheet('Ringkasan');
   ring.clear();
   ring.appendRow(['Pakai Uang', 'Total']);
-  Object.keys(totals).sort().forEach(function(k){
-    ring.appendRow([k, totals[k]]);
-  });
+  Object.keys(totals).sort().forEach(function(k){ ring.appendRow([k, totals[k]]); });
   ring.appendRow(['Total Semua', grandTotal]);
   ring.getRange(1, 1, 1, 2).setFontWeight('bold');
   ring.getRange(ring.getLastRow(), 1, 1, 2).setFontWeight('bold');
@@ -670,94 +658,50 @@ function jsonOut_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }`;
 
-async function loadData(){
-  try{
-    const res = await storage.get('app-data');
-    if(res && res.value) DATA = JSON.parse(res.value);
-    if(!DATA.projectLinks) DATA.projectLinks = {};
-    // migrasi format lama (string url) -> object {sheetUrl, scriptUrl}
-    Object.keys(DATA.projectLinks).forEach(k=>{
-      if(typeof DATA.projectLinks[k] === 'string'){
-        DATA.projectLinks[k] = { sheetUrl: DATA.projectLinks[k], scriptUrl: '' };
-      }
-    });
-  }catch(e){ /* first run */ }
-  await syncFromRegistry_();
-  refreshDropdowns();
-  renderStats();
-  renderBoard();
-  updateProjectLinkRow();
-  updateUangDeleteRow();
+function initApp(){
+  onSnapshot(query(collection(db,'records'), orderBy('createdAt','desc')), (snap)=>{
+    DATA.records = snap.docs.map(d=>({ id: d.id, ...d.data() }));
+    renderStats();
+    renderBoard();
+  }, (err)=>{ console.error('gagal baca records', err); showToast('Gagal terhubung ke database. Cek koneksi internet.', 'err'); });
+
+  onSnapshot(doc(db,'config','options'), (snap)=>{
+    if(snap.exists()){
+      const d = snap.data();
+      DATA.options.uang = d.uang && d.uang.length ? d.uang : DATA.options.uang;
+      DATA.options.project = d.project || [];
+    }
+    refreshDropdowns();
+    updateUangDeleteRow();
+  });
+
+  onSnapshot(doc(db,'config','projectLinks'), (snap)=>{
+    DATA.projectLinks = snap.exists() ? snap.data() : {};
+    refreshDropdowns();
+    updateProjectLinkRow();
+  });
+
+  onSnapshot(doc(db,'config','cloudinary'), (snap)=>{
+    if(snap.exists()){
+      DATA.cloudName = snap.data().cloudName || '';
+      DATA.uploadPreset = snap.data().uploadPreset || '';
+    }
+  });
+
   document.getElementById('scriptCodeBox').textContent = APPS_SCRIPT_CODE;
   const today = new Date();
   document.getElementById('f_date').value = today.toISOString().slice(0,10);
   document.getElementById('todayLabel').textContent = today.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
-  syncAllConfiguredProjects(true);
-}
-async function syncFromRegistry_(){
-  if(!REGISTRY_URL) return;
-  try{
-    const json = await readViaIframe_(REGISTRY_URL);
-    if(!json || json.status !== 'ok') return;
-    let changed = false;
-    const registryProjectNames = new Set((json.projects||[]).map(p=>p.project));
-
-    (json.projects || []).forEach(p=>{
-      if(!p.project) return;
-      if(!DATA.options.project.includes(p.project)){ DATA.options.project.push(p.project); changed = true; }
-      const existing = DATA.projectLinks[p.project] || {};
-      if(existing.sheetUrl !== p.sheetUrl || existing.scriptUrl !== p.scriptUrl){
-        DATA.projectLinks[p.project] = { sheetUrl: p.sheetUrl || existing.sheetUrl || '', scriptUrl: p.scriptUrl || existing.scriptUrl || '' };
-        changed = true;
-      }
-    });
-
-    // project yang udah ada di device ini tapi belum kedaftar di pusat -> daftarkan otomatis
-    Object.keys(DATA.projectLinks).forEach(name=>{
-      if(!registryProjectNames.has(name)){
-        const cfg = DATA.projectLinks[name];
-        if(cfg.scriptUrl){ registerToRegistry_(name, cfg.sheetUrl||'', cfg.scriptUrl||''); }
-      }
-    });
-
-    if(json.config){
-      if(json.config.cloudName && json.config.cloudName !== DATA.cloudName){ DATA.cloudName = json.config.cloudName; changed = true; }
-      if(json.config.uploadPreset && json.config.uploadPreset !== DATA.uploadPreset){ DATA.uploadPreset = json.config.uploadPreset; changed = true; }
-      if(json.config.uangList){
-        try{
-          const remoteUang = JSON.parse(json.config.uangList);
-          remoteUang.forEach(u=>{ if(u && !DATA.options.uang.includes(u)){ DATA.options.uang.push(u); changed = true; } });
-        }catch(e){}
-      }
-    }
-
-    // pilihan "uang" lokal yang mungkin belum ada di pusat -> daftarkan juga (aman diulang)
-    registerUangList_();
-
-    if(changed) await persist();
-  }catch(e){
-    console.error('gagal sync dari registry', e);
-  }
 }
 
-function registerUangList_(){
-  if(!REGISTRY_URL) return;
-  const sep = REGISTRY_URL.includes('?') ? '&' : '?';
-  sendViaIframe_(REGISTRY_URL + sep + 'action=register_config&uangList=' + encodeURIComponent(JSON.stringify(DATA.options.uang)) + '&_=' + Date.now());
+async function saveOptionsToFirestore_(){
+  await setDoc(doc(db,'config','options'), DATA.options);
 }
-
-function registerToRegistry_(project, sheetUrl, scriptUrl){
-  if(!REGISTRY_URL) return;
-  const sep = REGISTRY_URL.includes('?') ? '&' : '?';
-  sendViaIframe_(REGISTRY_URL + sep + 'action=register_project&project=' + encodeURIComponent(project) + '&sheetUrl=' + encodeURIComponent(sheetUrl) + '&scriptUrl=' + encodeURIComponent(scriptUrl) + '&_=' + Date.now());
-  if(DATA.cloudName || DATA.uploadPreset){
-    sendViaIframe_(REGISTRY_URL + sep + 'action=register_config&cloudName=' + encodeURIComponent(DATA.cloudName||'') + '&uploadPreset=' + encodeURIComponent(DATA.uploadPreset||'') + '&_=' + (Date.now()+1));
-  }
+async function saveProjectLinksToFirestore_(){
+  await setDoc(doc(db,'config','projectLinks'), DATA.projectLinks);
 }
-
-async function persist(){
-  try{ await storage.set('app-data', JSON.stringify(DATA)); }
-  catch(e){ console.error('gagal simpan', e); showToast('Gagal menyimpan data lokal.', 'err'); }
+async function saveCloudinaryToFirestore_(){
+  await setDoc(doc(db,'config','cloudinary'), { cloudName: DATA.cloudName || '', uploadPreset: DATA.uploadPreset || '' });
 }
 
 function switchView(v){
@@ -790,6 +734,10 @@ document.getElementById('fileInput').addEventListener('change', function(e){
   };
   reader.readAsDataURL(file);
 });
+
+function handleDropZoneClick(){
+  if(!noReceipt) document.getElementById('fileInput').click();
+}
 
 function toggleNoReceipt(){
   noReceipt = document.getElementById('noReceiptChk').checked;
@@ -857,7 +805,7 @@ function handleNewOption(sel, key){
   box.style.display = sel.value==='__new__' ? 'flex' : 'none';
   if(key==='project') updateProjectLinkRow();
 }
-function confirmNewOption(key){
+async function confirmNewOption(key){
   const input = document.getElementById('new'+key.charAt(0).toUpperCase()+key.slice(1)+'Input');
   const val = input.value.trim();
   if(!val) return;
@@ -866,13 +814,10 @@ function confirmNewOption(key){
   document.getElementById('f_'+key).value = val;
   document.getElementById('new'+key.charAt(0).toUpperCase()+key.slice(1)+'Box').style.display='none';
   input.value='';
-  persist();
+  await saveOptionsToFirestore_();
   if(key==='project'){
     updateProjectLinkRow();
     openLinkModal();
-  }
-  if(key==='uang'){
-    registerUangList_();
   }
 }
 
@@ -891,12 +836,10 @@ async function deleteUangOption(){
   );
   if(!ok) return;
   DATA.options.uang = DATA.options.uang.filter(u => u !== val);
-  await persist();
-  registerUangList_();
+  await saveOptionsToFirestore_();
   refreshDropdowns();
   document.getElementById('f_uang').value = '';
   updateUangDeleteRow();
-  renderStats();
   showToast('Opsi "'+val+'" dihapus dari daftar Pakai Uang Siapa.', 'ok');
 }
 
@@ -914,13 +857,13 @@ function updateProjectLinkRow(){
   const textEl = document.getElementById('projectLinkText');
   if(cfg.scriptUrl){
     dot.className = 'sync-dot on';
-    textEl.textContent = 'Sinkron otomatis aktif untuk "'+proj+'"';
+    textEl.textContent = 'Salinan otomatis ke spreadsheet aktif untuk "'+proj+'"';
   } else if(cfg.sheetUrl){
     dot.className = 'sync-dot off';
     textEl.textContent = 'Link ada, tapi kirim otomatis belum diatur';
   } else {
     dot.className = 'sync-dot off';
-    textEl.textContent = 'Sinkronisasi belum diatur untuk "'+proj+'"';
+    textEl.textContent = 'Salinan ke spreadsheet belum diatur untuk "'+proj+'" (opsional)';
   }
 }
 document.getElementById('f_project').addEventListener('change', updateProjectLinkRow);
@@ -938,27 +881,6 @@ function openLinkModal(){
   document.getElementById('modalStatus').innerHTML = '';
   document.getElementById('linkModal').classList.add('open');
 }
-async function deleteProject(){
-  if(!modalProject) return;
-  const ok = confirm(
-    'Hapus project "'+modalProject+'" dari daftar NotaX?\n\n' +
-    '- Spreadsheet asli di Google Drive TIDAK akan terhapus.\n' +
-    '- Catatan yang sudah tersimpan di Riwayat Belanja TIDAK akan terhapus, cuma nanti project ini tidak lagi muncul di dropdown pilihan.\n\n' +
-    'Lanjutkan?'
-  );
-  if(!ok) return;
-  const proj = modalProject;
-  DATA.options.project = DATA.options.project.filter(p => p !== proj);
-  delete DATA.projectLinks[proj];
-  await persist();
-  closeLinkModal();
-  document.getElementById('f_project').value = '';
-  refreshDropdowns();
-  updateProjectLinkRow();
-  renderBoard();
-  showToast('Project "'+proj+'" dihapus dari daftar NotaX.', 'ok');
-}
-
 function closeLinkModal(){
   document.getElementById('linkModal').classList.remove('open');
 }
@@ -969,11 +891,11 @@ async function saveLinkModal(){
   DATA.cloudName = document.getElementById('m_cloudName').value.trim();
   DATA.uploadPreset = document.getElementById('m_uploadPreset').value.trim();
   DATA.projectLinks[modalProject] = { sheetUrl, scriptUrl };
-  await persist();
+  await saveProjectLinksToFirestore_();
+  await saveCloudinaryToFirestore_();
   updateProjectLinkRow();
   closeLinkModal();
-  showToast('Pengaturan spreadsheet untuk "'+modalProject+'" disimpan.', 'ok');
-  registerToRegistry_(modalProject, sheetUrl, scriptUrl);
+  showToast('Pengaturan untuk "'+modalProject+'" disimpan — langsung berlaku di semua device.', 'ok');
 }
 function copyScriptCode(){
   navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(()=>{
@@ -983,57 +905,25 @@ function copyScriptCode(){
   });
 }
 
-async function testSendToSheet(){
-  const scriptUrl = document.getElementById('m_scriptUrl').value.trim();
-  const statusEl = document.getElementById('modalStatus');
-  if(!scriptUrl){ statusEl.innerHTML = '<div class="status-line err">Isi dulu Apps Script Web App URL-nya.</div>'; return; }
-  statusEl.innerHTML = '<div class="status-line info">Mengirim data percobaan...</div>';
-  const payload = {
-    id: 'TEST-' + Date.now(),
-    tanggal: new Date().toISOString().slice(0,10),
-    beli_apa: '(tes koneksi dari NotaX - ' + new Date().toLocaleTimeString('id-ID') + ')',
-    total: 0,
-    pakai_uang: '-',
-    project: modalProject || '-',
-    ada_bukti_nota: 'Tidak',
-    catatan: 'Baris ini boleh dihapus, ini cuma tes koneksi.'
-  };
-  const result = await sendToScript(scriptUrl, payload);
-  if(result === 'ok'){
-    statusEl.innerHTML = '<div class="status-line ok">✓ Berhasil dikonfirmasi! Cek spreadsheet-nya, harusnya ada baris tes baru.</div>';
-  } else if(result === 'unknown'){
-    statusEl.innerHTML = '<div class="status-line info">Data sudah dikirim. Browser tidak bisa mengonfirmasi otomatis, jadi <b>cek langsung ke tab "Catatan" di spreadsheet</b> — cari baris "(tes koneksi dari NotaX - '+new Date().toLocaleTimeString('id-ID')+')". Kalau ada, berarti berhasil.</div>';
-  } else {
-    statusEl.innerHTML = '<div class="status-line err">Gagal terkirim. Cek lagi URL-nya, dan pastikan deployment diatur "Anyone" bisa akses.</div>';
-  }
-}
-
-async function uploadToCloudinary_(fotoDataUrl, cloudName, uploadPreset, projectName){
-  try{
-    const formData = new FormData();
-    formData.append('file', fotoDataUrl);
-    formData.append('upload_preset', uploadPreset);
-    formData.append('folder', 'notax/' + (projectName || 'lainnya'));
-    const res = await fetch('https://api.cloudinary.com/v1_1/' + encodeURIComponent(cloudName) + '/image/upload', {
-      method: 'POST',
-      body: formData
-    });
-    const json = await res.json();
-    if(json && json.secure_url){
-      return json.secure_url;
-    }
-    console.error('gagal upload cloudinary', json);
-    return '';
-  }catch(e){
-    console.error('gagal upload ke cloudinary', e);
-    return '';
-  }
-}
-
-async function sendToScript(scriptUrl, payload){
-  const sep = scriptUrl.includes('?') ? '&' : '?';
-  const url = scriptUrl + sep + 'data=' + encodeURIComponent(JSON.stringify(payload)) + '&_=' + Date.now();
-  return await sendViaIframe_(url);
+async function deleteProject(){
+  if(!modalProject) return;
+  const ok = confirm(
+    'Hapus project "'+modalProject+'" dari daftar?\n\n' +
+    '- Spreadsheet asli di Google Drive TIDAK akan terhapus.\n' +
+    '- Catatan yang sudah tersimpan TIDAK akan terhapus.\n\n' +
+    'Lanjutkan?'
+  );
+  if(!ok) return;
+  const proj = modalProject;
+  DATA.options.project = DATA.options.project.filter(p => p !== proj);
+  delete DATA.projectLinks[proj];
+  await saveOptionsToFirestore_();
+  await saveProjectLinksToFirestore_();
+  closeLinkModal();
+  document.getElementById('f_project').value = '';
+  refreshDropdowns();
+  updateProjectLinkRow();
+  showToast('Project "'+proj+'" dihapus dari daftar.', 'ok');
 }
 
 function sendViaIframe_(url){
@@ -1045,124 +935,58 @@ function sendViaIframe_(url){
       if(done) return;
       done = true;
       setTimeout(()=>{ if(iframe.parentNode) iframe.remove(); }, 300);
-      // jeda kecil sebelum melanjutkan, memberi waktu server benar-benar menyelesaikan proses di baliknya
       setTimeout(()=> resolve(status), 250);
     };
-    iframe.onload = ()=> finish('unknown'); // berhasil dimuat, tapi isinya cross-origin jadi tidak bisa dibaca
+    iframe.onload = ()=> finish('unknown');
     iframe.onerror = ()=> finish('error');
     iframe.src = url;
     document.body.appendChild(iframe);
-    setTimeout(()=> finish('unknown'), 7000); // jaga-jaga kalau event onload tidak terpicu
+    setTimeout(()=> finish('unknown'), 7000);
   });
 }
 
-function formatSheetDate_(v){
-  if(!v) return '';
-  if(typeof v === 'string' && v.includes('T')) return v.slice(0,10);
-  if(typeof v === 'string') return v;
-  return '';
+async function sendToScript(scriptUrl, payload){
+  const sep = scriptUrl.includes('?') ? '&' : '?';
+  const url = scriptUrl + sep + 'data=' + encodeURIComponent(JSON.stringify(payload)) + '&_=' + Date.now();
+  return await sendViaIframe_(url);
 }
 
-function readViaIframe_(scriptUrl){
-  return new Promise((resolve)=>{
-    const sep = scriptUrl.includes('?') ? '&' : '?';
-    const url = scriptUrl + sep + 'action=read&_=' + Date.now();
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    let done = false;
-    function handler(event){
-      if(done) return;
-      if(!event.data || typeof event.data !== 'object' || !('status' in event.data)) return;
-      done = true;
-      window.removeEventListener('message', handler);
-      setTimeout(()=>{ if(iframe.parentNode) iframe.remove(); }, 300);
-      resolve(event.data);
-    }
-    window.addEventListener('message', handler);
-    iframe.src = url;
-    document.body.appendChild(iframe);
-    setTimeout(()=>{
-      if(done) return;
-      done = true;
-      window.removeEventListener('message', handler);
-      if(iframe.parentNode) iframe.remove();
-      resolve(null);
-    }, 10000);
-  });
-}
-
-async function syncProjectFromSheet(project){
-  const cfg = getLinkCfg(project);
-  if(!cfg.scriptUrl) return {status:'no-config'};
+async function uploadToCloudinary_(fotoDataUrl, cloudName, uploadPreset, projectName){
   try{
-    const json = await readViaIframe_(cfg.scriptUrl);
-    if(!json || json.status !== 'ok') return {status:'error'};
-    const sheetRows = json.rows || [];
-    const sheetIds = new Set(sheetRows.map(r=>r.id));
-    let changed = false;
-
-    const before = DATA.records.length;
-    DATA.records = DATA.records.filter(r=>{
-      if(r.project !== project) return true;
-      if(!r.synced) return true; // belum pernah kekonfirmasi terkirim, jangan disentuh dari sini
-      return sheetIds.has(r.id);
+    const formData = new FormData();
+    formData.append('file', fotoDataUrl);
+    formData.append('upload_preset', uploadPreset);
+    formData.append('folder', 'notax/' + (projectName || 'lainnya'));
+    const res = await fetch('https://api.cloudinary.com/v1_1/' + encodeURIComponent(cloudName) + '/image/upload', {
+      method: 'POST', body: formData
     });
-    if(DATA.records.length !== before) changed = true;
-
-    sheetRows.forEach(row=>{
-      let local = DATA.records.find(r=>r.id === row.id);
-      const newTotal = Number(row.total)||0;
-      const newDesc = row.beli_apa || '';
-      const newUang = row.pakai_uang || (local ? local.uang : '');
-      const newNote = row.catatan || '';
-      const newDate = formatSheetDate_(row.tanggal) || (local ? local.date : '');
-      const newFotoUrl = row.foto_url || '';
-
-      if(!local){
-        // baris ada di spreadsheet tapi belum ada di device ini -> tarik masuk sebagai catatan baru
-        local = {
-          id: row.id, date: newDate, desc: newDesc, total: newTotal, uang: newUang,
-          project: project, note: newNote,
-          hasReceipt: row.ada_bukti_nota === 'Ya',
-          receiptImage: null, fotoUrl: newFotoUrl,
-          synced: true, createdAt: Date.now()
-        };
-        DATA.records.unshift(local);
-        changed = true;
-      } else if(local.desc!==newDesc || local.total!==newTotal || local.uang!==newUang || local.note!==newNote || local.date!==newDate || local.fotoUrl!==newFotoUrl){
-        local.desc = newDesc; local.total = newTotal; local.uang = newUang;
-        local.note = newNote; local.date = newDate; local.fotoUrl = newFotoUrl;
-        changed = true;
-      }
-
-      if(newUang && !DATA.options.uang.includes(newUang)){ DATA.options.uang.push(newUang); changed = true; }
-    });
-
-    if(changed) await persist();
-    return {status:'ok', changed};
+    const json = await res.json();
+    if(json && json.secure_url) return json.secure_url;
+    console.error('gagal upload cloudinary', json);
+    return '';
   }catch(e){
-    console.error('sync gagal', e);
-    return {status:'error'};
+    console.error('gagal upload ke cloudinary', e);
+    return '';
   }
 }
 
-async function syncAllConfiguredProjects(silent){
-  const projects = Object.keys(DATA.projectLinks).filter(p=>DATA.projectLinks[p].scriptUrl);
-  if(projects.length===0){ if(!silent) showToast('Belum ada project dengan sinkron otomatis diatur.', 'err'); return; }
-  if(!silent) showToast('Menyinkronkan dari spreadsheet...', 'info');
-  let anyChanged=false, anyError=false;
-  for(const p of projects){
-    const r = await syncProjectFromSheet(p);
-    if(r.status==='error') anyError=true;
-    if(r.changed) anyChanged=true;
-  }
-  refreshDropdowns();
-  renderStats();
-  renderBoard();
-  if(!silent){
-    if(anyError) showToast('Sync baca-balik butuh NotaX di-hosting (https), belum jalan dari file lokal. Fitur kirim nota tetap jalan normal.', 'err');
-    else if(anyChanged) showToast('✓ Riwayat diperbarui sesuai perubahan di spreadsheet.', 'ok');
-    else showToast('Sudah sinkron, tidak ada perubahan baru.', 'ok');
+async function testSendToSheet(){
+  const scriptUrl = document.getElementById('m_scriptUrl').value.trim();
+  const statusEl = document.getElementById('modalStatus');
+  if(!scriptUrl){ statusEl.innerHTML = '<div class="status-line err">Isi dulu Apps Script Web App URL-nya.</div>'; return; }
+  statusEl.innerHTML = '<div class="status-line info">Mengirim data percobaan...</div>';
+  const payload = {
+    id: 'TEST-' + Date.now(),
+    tanggal: new Date().toISOString().slice(0,10),
+    beli_apa: '(tes koneksi dari NotaX - ' + new Date().toLocaleTimeString('id-ID') + ')',
+    total: 0, pakai_uang: '-', project: modalProject || '-',
+    ada_bukti_nota: 'Tidak', catatan: 'Baris ini boleh dihapus, ini cuma tes koneksi.'
+  };
+  const result = await sendToScript(scriptUrl, payload);
+  if(result === 'unknown'){
+    statusEl.innerHTML = '<div class="status-line info">Data sudah dikirim. Cek langsung ke tab "Catatan" di spreadsheet untuk memastikan.</div>';
+  } else {
+    statusEl.innerHTML = '<div class="status-line err">Gagal terkirim. Cek lagi URL-nya.</div>';
   }
 }
 
@@ -1171,9 +995,8 @@ function handleSheetBtn(){
   if(!proj){ showToast('Pilih project dulu di filter untuk membuka spreadsheet-nya.', 'err'); return; }
   const cfg = getLinkCfg(proj);
   if(cfg.sheetUrl){ window.open(cfg.sheetUrl, '_blank'); }
-  else { showToast('Belum ada link spreadsheet untuk project ini. Atur lewat form Papan Nota.', 'err'); }
+  else { showToast('Belum ada link spreadsheet untuk project ini.', 'err'); }
 }
-
 function openRecordSheet(proj){
   const cfg = getLinkCfg(proj);
   if(cfg.sheetUrl){ window.open(cfg.sheetUrl,'_blank'); }
@@ -1189,61 +1012,54 @@ async function saveRecord(){
   if(!project || project==='__new__'){ showToast('Pilih dulu untuk project/keperluan apa.', 'err'); return; }
   if(!noReceipt && !receiptImage){ showToast('Upload bukti nota, atau centang "Tidak ada bukti nota".', 'err'); return; }
 
-  const rec = {
-    id: 'r'+Date.now(),
-    date: document.getElementById('f_date').value,
-    desc: document.getElementById('f_desc').value.trim(),
-    total: total,
-    uang: uang,
-    project: project,
-    note: document.getElementById('f_note').value.trim(),
-    hasReceipt: !noReceipt,
-    receiptImage: noReceipt ? null : receiptImage,
-    createdAt: Date.now(),
-    synced: false
-  };
-  DATA.records.unshift(rec);
-  await persist();
+  const id = 'r' + Date.now();
+  const desc = document.getElementById('f_desc').value.trim();
+  const date = document.getElementById('f_date').value;
+  const note = document.getElementById('f_note').value.trim();
+  const hasReceipt = !noReceipt;
+  const localReceiptImage = hasReceipt ? receiptImage : null;
+
+  showToast('Menyimpan...', 'info');
+
+  let fotoUrl = '';
+  if(hasReceipt && localReceiptImage && DATA.cloudName && DATA.uploadPreset){
+    showToast('Mengupload foto...', 'info');
+    fotoUrl = await uploadToCloudinary_(localReceiptImage, DATA.cloudName, DATA.uploadPreset, project);
+  }
+
+  const recordData = { date, desc, total, uang, project, note, hasReceipt, fotoUrl, createdAt: Date.now() };
+  try{
+    await setDoc(doc(db,'records',id), recordData);
+    showToast('✓ Tersimpan.', 'ok');
+  }catch(e){
+    console.error(e);
+    showToast('Gagal menyimpan ke database. Cek koneksi internet.', 'err');
+    return;
+  }
+
   resetForm();
-  renderStats();
-  renderBoard();
-  refreshDropdowns();
 
   const cfg = getLinkCfg(project);
   if(cfg.scriptUrl){
-    showToast('Tersimpan. Mengirim ke spreadsheet...', 'info');
-
-    let fotoUrl = '';
-    if(rec.hasReceipt && rec.receiptImage && DATA.cloudName && DATA.uploadPreset){
-      showToast('Mengupload foto...', 'info');
-      fotoUrl = await uploadToCloudinary_(rec.receiptImage, DATA.cloudName, DATA.uploadPreset, rec.project);
-      rec.fotoUrl = fotoUrl;
-      await persist();
-    }
-
-    const result = await sendToScript(cfg.scriptUrl, {
-      id: rec.id, tanggal: rec.date, beli_apa: rec.desc, total: rec.total, pakai_uang: rec.uang,
-      project: rec.project, ada_bukti_nota: rec.hasReceipt?'Ya':'Tidak', catatan: rec.note,
-      foto_url: fotoUrl
+    sendToScript(cfg.scriptUrl, {
+      id, tanggal: date, beli_apa: desc, total, pakai_uang: uang,
+      project, ada_bukti_nota: hasReceipt?'Ya':'Tidak', catatan: note, foto_url: fotoUrl
+    }).then(result=>{
+      if(result==='unknown') showToast('Salinan terkirim ke spreadsheet "'+project+'".', 'ok');
     });
-    rec.synced = (result === 'ok' || result === 'unknown');
-    if(result === 'ok') showToast('✓ Tersimpan & masuk ke spreadsheet "'+project+'".', 'ok');
-    else if(result === 'unknown') showToast('Tersimpan & terkirim (cek manual di spreadsheet).', 'ok');
-    else showToast('Tersimpan di NotaX, tapi GAGAL kirim ke spreadsheet. Cek link Apps Script-nya.', 'err');
-    await persist();
-    renderBoard();
-  } else {
-    showToast('✓ Tersimpan. Sinkron otomatis belum diatur untuk project ini.', 'ok');
   }
 }
 
 async function deleteRecord(id){
-  if(!confirm('Hapus catatan ini? Kalau project ini sudah tersambung spreadsheet, baris yang sesuai di spreadsheet juga otomatis ikut dihapus.')) return;
+  if(!confirm('Hapus catatan ini? Kalau project ini tersambung spreadsheet, baris yang sesuai juga otomatis ikut dihapus di sana.')) return;
   const rec = DATA.records.find(r => r.id === id);
-  DATA.records = DATA.records.filter(r=>r.id!==id);
-  await persist();
-  renderStats();
-  renderBoard();
+  try{
+    await deleteDoc(doc(db,'records',id));
+  }catch(e){
+    console.error(e);
+    showToast('Gagal menghapus. Cek koneksi internet.', 'err');
+    return;
+  }
   if(rec){
     const cfg = getLinkCfg(rec.project);
     if(cfg.scriptUrl){
@@ -1280,15 +1096,7 @@ function renderBoard(){
     </div>`;
     return;
   }
-
   board.innerHTML = list.map(r=>{
-    const cfg = getLinkCfg(r.project);
-    let syncNote = '';
-    if(cfg.scriptUrl){
-      syncNote = r.synced
-        ? `<div class="item-sync"><span class="sync-dot on"></span> Sudah masuk ke spreadsheet</div>`
-        : `<div class="item-sync"><span class="sync-dot off"></span> Belum terkonfirmasi terkirim</div>`;
-    }
     return `
     <div class="item">
       <div class="item-top">
@@ -1298,21 +1106,18 @@ function renderBoard(){
         </div>
         <div class="item-amt">${fmtRp(r.total)}</div>
       </div>
-      ${r.hasReceipt && r.receiptImage ? `<img class="item-thumb" src="${r.receiptImage}" onclick="openLightbox('${r.receiptImage}')">`
-        : (r.hasReceipt && r.fotoUrl ? `<img class="item-thumb" src="${r.fotoUrl}" onclick="openLightbox('${r.fotoUrl}')">`
-        : `<div class="no-receipt">🚫 Tidak ada bukti nota</div>`)}
+      ${r.hasReceipt && r.fotoUrl ? `<img class="item-thumb" src="${r.fotoUrl}" onclick="window.openLightbox('${r.fotoUrl}')">` : (r.hasReceipt ? `<div class="no-receipt" style="color:var(--ink-faint);">📎 Ada bukti nota</div>` : `<div class="no-receipt">🚫 Tidak ada bukti nota</div>`)}
       ${r.note ? `<div class="item-note">${escapeHtml(r.note)}</div>` : ''}
       <div class="badges">
         <span class="badge uang">${escapeHtml(r.uang)}</span>
         <span class="badge project">${escapeHtml(r.project)}</span>
       </div>
-      ${syncNote}
       <div class="item-actions">
-        <button class="sheet-link-btn" onclick="openRecordSheet('${escapeHtml(r.project).replace(/'/g,"\\'")}')">
+        <button class="sheet-link-btn" onclick="window.openRecordSheet('${escapeHtml(r.project).replace(/'/g,"\\'")}')">
           <svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.5-1.5"/></svg>
           Spreadsheet
         </button>
-        <button class="btn btn-danger btn-sm" onclick="deleteRecord('${r.id}')">Hapus</button>
+        <button class="btn btn-danger btn-sm" onclick="window.deleteRecord('${r.id}')">Hapus</button>
       </div>
     </div>
   `;}).join('');
@@ -1323,7 +1128,27 @@ function openLightbox(src){
   document.getElementById('lightbox').classList.add('open');
 }
 
-loadData();
+window.switchView = switchView;
+window.handleDropZoneClick = handleDropZoneClick;
+window.toggleNoReceipt = toggleNoReceipt;
+window.resetForm = resetForm;
+window.handleNewOption = handleNewOption;
+window.confirmNewOption = confirmNewOption;
+window.deleteUangOption = deleteUangOption;
+window.openLinkModal = openLinkModal;
+window.closeLinkModal = closeLinkModal;
+window.saveLinkModal = saveLinkModal;
+window.deleteProject = deleteProject;
+window.copyScriptCode = copyScriptCode;
+window.testSendToSheet = testSendToSheet;
+window.handleSheetBtn = handleSheetBtn;
+window.openRecordSheet = openRecordSheet;
+window.saveRecord = saveRecord;
+window.deleteRecord = deleteRecord;
+window.openLightbox = openLightbox;
+window.renderBoard = renderBoard;
+
+initApp();
 </script>
 </body>
 </html>
