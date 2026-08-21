@@ -978,30 +978,22 @@ async function sendPhotoChunks_(scriptUrl, payload){
   delete meta.foto_base64;
   const sep = scriptUrl.includes('?') ? '&' : '?';
 
-  // 1. potong foto, kirim beberapa potongan sekaligus (paralel terbatas) biar cepat tapi tetap andal
+  // 1. potong foto, kirim SATU-SATU BERURUTAN (bukan paralel) biar setiap potongan
+  //    dipastikan sampai dulu sebelum lanjut ke potongan berikutnya — lebih lambat tapi lebih andal
   const chunkSize = 1500;
   const total = Math.max(1, Math.ceil(foto.length / chunkSize));
-  const CONCURRENCY = 3;
   showToast('Mengirim foto (0/'+total+')...', 'info');
 
-  const queue = Array.from({length: total}, (_, i) => i);
-  let sentCount = 0;
-  async function worker(){
-    while(queue.length){
-      const i = queue.shift();
-      const chunk = foto.slice(i*chunkSize, (i+1)*chunkSize);
-      const url = scriptUrl + sep + 'action=chunk&id=' + encodeURIComponent(id) + '&idx=' + i + '&total=' + total + '&chunk=' + encodeURIComponent(chunk) + '&_=' + Date.now() + i;
-      await sendViaIframe_(url);
-      sentCount++;
-      if(total > 8 && sentCount % Math.ceil(total/4) === 0){
-        showToast('Mengirim foto ('+sentCount+'/'+total+')...', 'info');
-      }
+  for(let i=0;i<total;i++){
+    const chunk = foto.slice(i*chunkSize, (i+1)*chunkSize);
+    const url = scriptUrl + sep + 'action=chunk&id=' + encodeURIComponent(id) + '&idx=' + i + '&total=' + total + '&chunk=' + encodeURIComponent(chunk) + '&_=' + Date.now() + '_' + i;
+    await sendViaIframe_(url);
+    if(total > 6 && (i+1) % Math.max(1, Math.ceil(total/5)) === 0){
+      showToast('Mengirim foto ('+(i+1)+'/'+total+')...', 'info');
     }
   }
-  await Promise.all(Array.from({length: Math.min(CONCURRENCY, total)}, worker));
 
-  // 2. semua potongan sudah terkirim; kirim data teksnya BARENG di permintaan terakhir ini,
-  //    supaya server bisa gabungkan foto + simpan baris sekaligus tanpa bergantung ke cache tahap sebelumnya
+  // 2. semua potongan sudah terkirim; kirim data teksnya BARENG di permintaan terakhir ini
   const finishUrl = scriptUrl + sep + 'action=finish&id=' + encodeURIComponent(id) + '&total=' + total +
     '&data=' + encodeURIComponent(JSON.stringify(meta)) + '&_=' + Date.now();
   await sendViaIframe_(finishUrl);
@@ -1018,7 +1010,8 @@ function sendViaIframe_(url){
       if(done) return;
       done = true;
       setTimeout(()=>{ if(iframe.parentNode) iframe.remove(); }, 300);
-      resolve(status);
+      // jeda kecil sebelum melanjutkan, memberi waktu server benar-benar menyelesaikan proses di baliknya
+      setTimeout(()=> resolve(status), 250);
     };
     iframe.onload = ()=> finish('unknown'); // berhasil dimuat, tapi isinya cross-origin jadi tidak bisa dibaca
     iframe.onerror = ()=> finish('error');
