@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NotaX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sidebar: #142219;
+    --sidebar-2: #1b2e22;
+    --accent: #2f7355;
+    --accent-dark: #235c44;
+    --accent-bright: #3fcf8e;
+    --bg: #f3f4f0;
+    --card: #ffffff;
+    --ink: #1f2a22;
+    --ink-soft: #667066;
+    --ink-faint: #9aa39a;
+    --line: #e6e8e2;
+    --red: #c15a4a;
+    --teal: #2f7373;
+    --olive: #7a7a3a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  .icon{width:16px;height:16px;flex-shrink:0;}
+  .icon-lg{width:22px;height:22px;}
+
+  /* ================= SIDEBAR ================= */
+  .sidebar{
+    position:fixed;top:0;left:0;bottom:0;width:230px;
+    background:var(--sidebar);color:#dfe6df;
+    display:flex;flex-direction:column;padding:26px 18px;
+    z-index:10;
+  }
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:34px;padding:0 4px;}
+  .brand-mark{
+    width:34px;height:34px;border-radius:9px;background:var(--accent);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .brand-name{font-size:18px;font-weight:800;color:#f2f4ee;letter-spacing:0.2px;}
+  .brand-name span{color:var(--accent-bright);}
+
+  .nav-item{
+    display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:9px;
+    font-size:13.5px;font-weight:500;color:#aab6ac;cursor:pointer;margin-bottom:4px;
+    transition:background .15s, color .15s;
+  }
+  .nav-item:hover{background:rgba(255,255,255,0.05);color:#e4e9e2;}
+  .nav-item.active{background:var(--accent-dark);color:#fff;}
+  .nav-item .icon{opacity:0.9;}
+
+  .sidebar-footer{margin-top:auto;}
+  .sidebar-card{
+    background:var(--sidebar-2);border-radius:11px;padding:16px;margin-bottom:14px;
+  }
+  .sidebar-card .name{font-size:13.5px;font-weight:800;color:#f2f4ee;margin-bottom:5px;}
+  .sidebar-card .name span{color:var(--accent-bright);}
+  .sidebar-card p{font-size:11.5px;color:#9aa89c;line-height:1.5;margin:0;}
+  .sidebar-copyright{font-size:10.5px;color:#6c7a6e;padding:0 4px;line-height:1.6;}
+
+  /* ================= MAIN ================= */
+  .main{margin-left:230px;padding:36px 40px 70px;}
+  .main-header{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    background:linear-gradient(120deg, var(--sidebar) 0%, var(--sidebar-2) 100%);
+    border-radius:16px;padding:30px 34px;margin-bottom:26px;position:relative;overflow:hidden;
+  }
+  .main-header h1{font-size:27px;color:#f5f6f1;margin:0 0 6px;font-weight:800;}
+  .main-header p{font-size:13.5px;color:#a9b6ab;max-width:440px;margin:0;line-height:1.55;}
+  .header-illustration{position:absolute;right:26px;top:50%;transform:translateY(-50%);opacity:0.95;}
+
+  .stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:26px;}
+  .stat-card{
+    background:var(--card);border:1px solid var(--line);border-radius:13px;padding:16px 20px;min-width:190px;
+    display:flex;justify-content:space-between;align-items:center;color:var(--ink);
+  }
+  .stat-card .label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;font-weight:700;opacity:0.75;}
+  .stat-card .val{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;margin-top:4px;}
+  .stat-card .badge-ico{
+    width:38px;height:38px;border-radius:10px;background:#eef4ee;color:var(--accent);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* ---- form card ---- */
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:28px 30px 32px;box-shadow:0 1px 2px rgba(20,30,20,0.03);
+  }
+  .card + .card{margin-top:22px;}
+  .card-header{
+    display:flex;justify-content:space-between;align-items:center;
+    padding-bottom:20px;margin-bottom:22px;border-bottom:1px solid var(--line);
+  }
+  .card-header-left{display:flex;align-items:center;gap:12px;}
+  .card-header-ico{
+    width:38px;height:38px;border-radius:10px;background:#e9f3ec;color:var(--accent);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .card-header h2{font-size:17px;margin:0;font-weight:700;}
+  .date-chip{
+    display:flex;align-items:center;gap:7px;background:#f5f6f2;border:1px solid var(--line);
+    border-radius:9px;padding:8px 13px;font-size:12.5px;color:var(--ink-soft);font-weight:500;
+  }
+
+  .field{margin-bottom:18px;}
+  .field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-soft);margin-bottom:7px;font-weight:700;}
+  .input-wrap{position:relative;}
+  .input-wrap .icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--ink-faint);}
+  .input-wrap input, .input-wrap select{padding-left:38px !important;}
+  input[type=text], input[type=number], input[type=date], input[type=url], select, textarea{
+    width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;
+    background:#fbfbfa;font-family:'Inter',sans-serif;font-size:13.5px;color:var(--ink);
+    transition:border-color .15s, box-shadow .15s, background .15s;
+    appearance:none;-webkit-appearance:none;
+  }
+  select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23667066' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:34px;}
+  input:focus, select:focus, textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,115,85,0.12);background:#fff;}
+  ::placeholder{color:var(--ink-faint);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:560px){ .row2{grid-template-columns:1fr;} }
+
+  .rp-wrap{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:10px;background:#fbfbfa;overflow:hidden;}
+  .rp-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,115,85,0.12);background:#fff;}
+  .rp-prefix{padding:11px 12px;color:var(--ink-soft);font-weight:600;font-size:13px;border-right:1px solid var(--line);background:#f3f4f0;}
+  .rp-wrap input{border:none;background:none;flex:1;}
+  .rp-wrap input:focus{box-shadow:none;}
+
+  .drop{
+    border:1.5px dashed #cfd4cb;border-radius:12px;padding:26px 16px;text-align:center;
+    cursor:pointer;color:var(--ink-soft);font-size:13px;margin-bottom:12px;background:#fbfbfa;
+    transition:border-color .15s, background .15s;
+  }
+  .drop:hover{border-color:var(--accent);background:#f4f8f5;}
+  .drop.disabled{opacity:0.45;cursor:not-allowed;}
+  .drop .drop-ico{margin-bottom:8px;color:var(--accent);}
+  .drop .hint{font-size:11px;color:var(--ink-faint);margin-top:3px;}
+  .drop img{max-height:150px;border-radius:8px;margin-top:10px;display:block;margin-left:auto;margin-right:auto;box-shadow:0 4px 12px rgba(0,0,0,0.12);}
+
+  .checkbox-row{display:flex;align-items:center;gap:9px;margin-bottom:20px;font-size:13px;color:var(--ink-soft);}
+  .checkbox-row input{width:16px;height:16px;accent-color:var(--accent);}
+
+  .link-row{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap;}
+  .link-row a{color:var(--accent);text-decoration:none;font-weight:600;}
+  .link-row a:hover{text-decoration:underline;}
+  .sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+  .sync-dot.on{background:var(--accent-bright);}
+  .sync-dot.off{background:#d8b06a;}
+  .link-edit-btn{background:none;border:none;color:var(--ink-faint);cursor:pointer;padding:2px 5px;display:flex;align-items:center;}
+  .link-edit-btn:hover{color:var(--accent);}
+  .add-new-inline{display:flex;gap:6px;margin-top:8px;}
+  .add-new-inline input{flex:1;padding:8px 10px;font-size:12px;}
+
+  .btn{
+    font-family:'Inter',sans-serif;font-size:13px;font-weight:700;padding:11px 20px;border-radius:10px;
+    border:none;cursor:pointer;letter-spacing:0.1px;display:inline-flex;align-items:center;gap:7px;
+    transition:transform .1s, opacity .15s, background .15s;
+  }
+  .btn:active{transform:scale(0.98);}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:hover{background:var(--accent-dark);}
+  .btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink-soft);}
+  .btn-ghost:hover{border-color:#c7ccc2;color:var(--ink);}
+  .btn-danger{background:none;border:1px solid #e6c3ba;color:var(--red);}
+  .btn-danger:hover{background:#fbf0ee;}
+  .btn:disabled{opacity:0.45;cursor:not-allowed;}
+  .btn-sm{padding:7px 12px;font-size:12px;}
+  .save-bar{display:flex;gap:10px;margin-top:24px;}
+  .save-bar .btn-primary{flex:1;justify-content:center;}
+
+  /* ---- history ---- */
+  .board-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  .board-filters{display:flex;gap:8px;flex-wrap:wrap;}
+  .board-filters select{padding:9px 30px 9px 13px;font-size:12.5px;width:auto;min-width:150px;}
+  .board-count{font-size:12px;color:var(--ink-faint);font-weight:500;margin-left:6px;}
+
+  .board-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;}
+  @media(max-width:820px){ .board-grid{grid-template-columns:1fr;} }
+  @media(max-width:900px){ .main{padding:28px 20px 60px;} }
+  @media(max-width:700px){ .sidebar{display:none;} .main{margin-left:0;} }
+
+  .item{
+    background:#fbfbfa;border:1px solid var(--line);border-radius:13px;padding:16px 17px;
+    transition:box-shadow .15s, transform .15s;
+  }
+  .item:hover{box-shadow:0 6px 16px rgba(20,30,20,0.06);transform:translateY(-2px);}
+  .item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .item-desc{font-weight:700;font-size:14px;}
+  .item-date{font-size:11px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+  .item-amt{font-family:'IBM Plex Mono',monospace;font-size:15.5px;font-weight:700;white-space:nowrap;color:var(--accent-dark);}
+  .item-note{font-size:12px;color:var(--ink-soft);margin:9px 0 0;font-style:italic;line-height:1.5;}
+  .item-thumb{max-width:100%;max-height:160px;border-radius:8px;margin:10px 0 0;display:block;border:1px solid var(--line);cursor:zoom-in;}
+  .no-receipt{font-size:11px;color:var(--red);margin-top:10px;display:flex;align-items:center;gap:5px;font-weight:500;}
+  .badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px;}
+  .badge{
+    font-size:10.5px;padding:4px 9px;border-radius:20px;color:#fff;
+    display:inline-flex;align-items:center;gap:4px;font-weight:600;
+  }
+  .badge.uang{background:var(--red);}
+  .badge.project{background:var(--teal);}
+  .item-sync{font-size:10px;margin-top:9px;display:flex;align-items:center;gap:5px;color:var(--ink-faint);}
+  .item-actions{display:flex;justify-content:space-between;align-items:center;margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);}
+  .sheet-link-btn{font-size:11.5px;color:var(--accent);text-decoration:none;font-weight:600;display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:0;}
+  .sheet-link-btn:hover{text-decoration:underline;}
+
+  .empty{
+    color:var(--ink-faint);font-size:13px;text-align:center;padding:56px 20px;
+    background:#fbfbfa;border:1.5px dashed var(--line);border-radius:14px;grid-column:1/-1;
+  }
+  .empty .icon-lg{margin-bottom:10px;color:var(--ink-faint);}
+  .empty .title{color:var(--ink-soft);font-weight:600;font-size:14px;margin-bottom:3px;}
+
+  .lightbox{position:fixed;inset:0;background:rgba(10,14,10,0.85);display:none;align-items:center;justify-content:center;z-index:50;padding:30px;cursor:zoom-out;}
+  .lightbox.open{display:flex;}
+  .lightbox img{max-width:100%;max-height:100%;border-radius:8px;box-shadow:0 20px 50px rgba(0,0,0,0.5);}
+
+  /* ---- modal ---- */
+  .modal-overlay{position:fixed;inset:0;background:rgba(15,20,15,0.55);display:none;align-items:center;justify-content:center;z-index:60;padding:20px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:#fff;border-radius:16px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:26px 28px 28px;}
+  .modal h3{margin:0 0 4px;font-size:17px;font-weight:800;}
+  .modal .sub{font-size:12.5px;color:var(--ink-soft);margin:0 0 20px;}
+  .modal .close-x{position:absolute;}
+  .modal-top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .modal-close{background:none;border:none;cursor:pointer;color:var(--ink-faint);padding:4px;}
+  .modal-close:hover{color:var(--ink);}
+  .status-line{display:flex;align-items:center;gap:7px;font-size:12.5px;margin-top:10px;padding:9px 12px;border-radius:8px;}
+  .status-line.ok{background:#eaf6ef;color:var(--accent-dark);}
+  .status-line.err{background:#fbeeeb;color:#a1402e;}
+  .status-line.info{background:#f2f4ee;color:var(--ink-soft);}
+  .guide-box{background:#f6f7f3;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:18px;}
+  .guide-box summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--accent-dark);}
+  .guide-steps{margin:14px 0 0;padding-left:18px;font-size:12.5px;color:var(--ink-soft);line-height:1.85;}
+  .code-box{
+    background:#1b2620;color:#d8e6d9;border-radius:9px;padding:14px 15px;font-family:'IBM Plex Mono',monospace;
+    font-size:11px;line-height:1.6;overflow-x:auto;white-space:pre;margin-top:10px;max-height:220px;overflow-y:auto;
+  }
+  .copy-btn{margin-top:8px;}
+  .toast-wrap{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:70;display:flex;flex-direction:column;gap:8px;align-items:center;}
+  .toast{
+    background:var(--ink);color:#fff;padding:11px 18px;border-radius:9px;font-size:13px;font-weight:500;
+    box-shadow:0 8px 20px rgba(0,0,0,0.25);display:flex;align-items:center;gap:8px;animation:toast-in .2s ease-out;
+  }
+  .toast.err{background:var(--red);}
+  .toast.ok{background:var(--accent-dark);}
+  @keyframes toast-in{from{opacity:0;transform:translateY(8px);}to{opacity:1;}}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>
+    </div>
+    <div class="brand-name">Nota<span>X</span></div>
+  </div>
+
+  <div class="nav-item active" id="navHome" onclick="switchView('home')">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+    Papan Nota
+  </div>
+  <div class="nav-item" id="navHistory" onclick="switchView('history')">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9z"/><path d="M9 11h6M9 15h4"/></svg>
+    Riwayat Belanja
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-card">
+      <div class="name">Nota<span>X</span></div>
+      <p>Catat, kelola, dan kontrol setiap pengeluaran proyek dengan mudah.</p>
+    </div>
+    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="main-header">
+    <div>
+      <h1>Papan Nota</h1>
+      <p>Tulis total belanja, upload bukti nota (atau tandai tidak ada), lalu pilih siapa yang bayar dan buat apa. Otomatis terkirim ke spreadsheet project-nya.</p>
+    </div>
+    <svg class="header-illustration" width="90" height="90" viewBox="0 0 90 90" fill="none">
+      <rect x="18" y="8" width="46" height="62" rx="4" fill="#f3efe0" transform="rotate(8 41 39)"/>
+      <rect x="12" y="5" width="46" height="62" rx="4" fill="#fbf8f0" stroke="#e6e0cc" transform="rotate(-3 35 36)"/>
+      <g transform="rotate(-3 35 36)">
+        <line x1="20" y1="20" x2="48" y2="20" stroke="#c9c2ab" stroke-width="2"/>
+        <line x1="20" y1="28" x2="48" y2="28" stroke="#c9c2ab" stroke-width="2"/>
+        <line x1="20" y1="36" x2="40" y2="36" stroke="#c9c2ab" stroke-width="2"/>
+      </g>
+      <circle cx="63" cy="55" r="17" fill="#3fcf8e"/>
+      <path d="M55 55 l6 6 l12-13" stroke="#0f2318" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+
+  <div class="stats" id="statsBar"></div>
+
+  <!-- ===================== VIEW: HOME ===================== -->
+  <div class="view active" id="viewHome">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-header-ico">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </div>
+          <h2>Catatan Baru</h2>
+        </div>
+        <div class="date-chip">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span id="todayLabel"></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Beli apa / keperluan singkat</label>
+        <input type="text" id="f_desc" placeholder="mis. Semen 5 sak, cat tembok, dll">
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Tanggal</label>
+          <input type="date" id="f_date">
+        </div>
+        <div class="field">
+          <label>Total harga di nota</label>
+          <div class="rp-wrap">
+            <div class="rp-prefix">Rp</div>
+            <input type="number" id="f_total" placeholder="0">
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Bukti nota</label>
+        <div class="drop" id="dropZone" onclick="if(!noReceipt) document.getElementById('fileInput').click()">
+          <div id="dropLabel">
+            <svg class="icon-lg drop-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;display:block;"><path d="M4 14.9A5 5 0 0 1 6 5.3 6 6 0 0 1 17.4 8H18a4 4 0 0 1 1 7.9"/><path d="M12 12v9"/><path d="m8 16 4-4 4 4"/></svg>
+            Klik untuk upload foto nota
+            <div class="hint">JPG, PNG maks. 5MB</div>
+          </div>
+          <img id="preview" style="display:none;">
+        </div>
+        <input type="file" id="fileInput" accept="image/*" style="display:none">
+        <div class="checkbox-row">
+          <input type="checkbox" id="noReceiptChk" onchange="toggleNoReceipt()">
+          <label for="noReceiptChk" style="margin:0;">Tidak ada bukti nota</label>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Pakai uang siapa</label>
+          <div class="input-wrap">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+            <select id="f_uang" onchange="handleNewOption(this,'uang'); updateUangDeleteRow();"></select>
+          </div>
+          <div class="add-new-inline" id="newUangBox" style="display:none;">
+            <input type="text" id="newUangInput" placeholder="Nama sumber uang baru">
+            <button class="btn btn-ghost btn-sm" onclick="confirmNewOption('uang')">Tambah</button>
+          </div>
+          <div class="link-row" id="uangDeleteRow" style="display:none;">
+            <button class="link-edit-btn" style="color:var(--red);" onclick="deleteUangOption()">
+              <svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+              Hapus opsi ini dari daftar
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Untuk project apa</label>
+          <div class="input-wrap">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            <select id="f_project" onchange="handleNewOption(this,'project')"></select>
+          </div>
+          <div class="add-new-inline" id="newProjectBox" style="display:none;">
+            <input type="text" id="newProjectInput" placeholder="Nama project baru">
+            <button class="btn btn-ghost btn-sm" onclick="confirmNewOption('project')">Tambah</button>
+          </div>
+          <div class="link-row" id="projectLinkRow" style="display:none;">
+            <span class="sync-dot off" id="projectSyncDot"></span>
+            <span id="projectLinkText">Sinkronisasi belum diatur</span>
+            <button class="link-edit-btn" onclick="openLinkModal()" title="Atur spreadsheet">
+              <svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              Atur
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Catatan (opsional)</label>
+        <textarea id="f_note" rows="2" placeholder="Tulis catatan tambahan (jika ada)..."></textarea>
+      </div>
+
+      <div class="save-bar">
+        <button class="btn btn-ghost" onclick="resetForm()">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          Bersihkan
+        </button>
+        <button class="btn btn-primary" onclick="saveRecord()">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+          Simpan & Kirim
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== VIEW: HISTORY ===================== -->
+  <div class="view" id="viewHistory">
+    <div class="card">
+      <div class="board-toolbar">
+        <div class="card-header-left">
+          <div class="card-header-ico">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9z"/><path d="M9 11h6M9 15h4"/></svg>
+          </div>
+          <h2 style="font-size:17px;font-weight:700;">Riwayat Belanja<span class="board-count" id="boardCount"></span></h2>
+        </div>
+        <div class="board-filters">
+          <select id="filterUang" onchange="renderBoard()"><option value="">Semua sumber uang</option></select>
+          <select id="filterProject" onchange="renderBoard()"><option value="">Semua project</option></select>
+          <button class="btn btn-ghost btn-sm" id="syncBtn" onclick="syncAllConfiguredProjects(false)">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+            Sync dari Spreadsheet
+          </button>
+          <button class="btn btn-ghost btn-sm" id="sheetBtn" onclick="handleSheetBtn()">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.5-1.5"/></svg>
+            Buka Spreadsheet
+          </button>
+        </div>
+      </div>
+      <div class="board-grid" id="board"></div>
+    </div>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('open')">
+  <img id="lightboxImg" src="">
+</div>
+
+<!-- ===================== MODAL: ATUR SPREADSHEET PROJECT ===================== -->
+<div class="modal-overlay" id="linkModal">
+  <div class="modal">
+    <div class="modal-top">
+      <div>
+        <h3 id="linkModalTitle">Atur Spreadsheet Project</h3>
+        <p class="sub">Sambungkan project ini ke spreadsheet Google-nya sendiri, biar tiap nota yang kamu simpan otomatis nambah baris ke sana.</p>
+      </div>
+      <button class="modal-close" onclick="closeLinkModal()">
+        <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="field">
+      <label>Link Spreadsheet (untuk dibuka & dilihat)</label>
+      <input type="url" id="m_sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/....">
+    </div>
+    <div class="field">
+      <label>Apps Script Web App URL (untuk kirim data otomatis)</label>
+      <input type="url" id="m_scriptUrl" placeholder="https://script.google.com/macros/s/..../exec">
+    </div>
+
+    <div id="modalStatus"></div>
+
+    <div class="save-bar" style="margin-top:16px;">
+      <button class="btn btn-ghost btn-sm" onclick="testSendToSheet()">Tes Kirim Data</button>
+      <button class="btn btn-primary" onclick="saveLinkModal()" style="flex:1;justify-content:center;">Simpan</button>
+    </div>
+    <button class="btn btn-danger btn-sm" onclick="deleteProject()" style="margin-top:10px;width:100%;justify-content:center;">
+      <svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      Hapus Project Ini dari NotaX
+    </button>
+
+    <details class="guide-box">
+      <summary>📋 Cara dapetin Apps Script Web App URL (sekali per spreadsheet)</summary>
+      <ol class="guide-steps">
+        <li>Buka spreadsheet project ini di Google Sheets.</li>
+        <li>Klik menu <b>Extensions → Apps Script</b>.</li>
+        <li>Hapus kode bawaan, lalu tempel kode di bawah ini.</li>
+        <li>Simpan (Ctrl+S / ikon disket), boleh dikasih nama misalnya "NotaX Sync".</li>
+        <li>Klik <b>Deploy → New deployment</b>. Pilih tipe <b>Web app</b>.</li>
+        <li>Execute as: <b>Me</b>. Who has access: <b>Anyone</b>. Klik <b>Deploy</b>.</li>
+        <li>Google akan minta izin akses — klik lanjutkan (kalau muncul peringatan "unsafe", klik Advanced → Go to (nama script) karena ini script buatan kamu sendiri).</li>
+        <li>Salin <b>Web app URL</b> yang muncul, tempel ke kolom "Apps Script Web App URL" di atas.</li>
+        <li><b>Penting:</b> jangan hapus atau ubah isi kolom <b>ID</b> di spreadsheet — kolom itu dipakai NotaX buat tahu baris mana yang cocok dengan catatan yang mana. Ubah/hapus kolom lain (Beli Apa, Total, dst) aman dan akan ke-sync ke NotaX.</li>
+        <li>Sudah pernah deploy sebelumnya (kode versi lama)? Update kode script-nya ke versi ini lagi, lalu <b>Deploy → Manage deployments</b> → klik ikon pensil di deployment yang ada → di "Version" pilih "New version" → klik <b>Deploy</b>. Cara ini bikin URL-nya tetap sama, jadi kamu tidak perlu ganti URL di NotaX lagi.</li>
+        <li>Script ini juga otomatis bikin tab <b>"Ringkasan"</b> berisi total belanja per "Pakai Uang" (mis. total Uang Hasani, total Uang PT) + total semuanya, yang selalu update tiap ada nota baru masuk.</li>
+        <li><b>Baru:</b> kalau nota-nya ada foto bukti, sekarang otomatis di-upload ke folder Google Drive (satu folder sama dengan spreadsheet-nya), dan link-nya nempel di kolom <b>"Link Foto Nota"</b>. Saat proses deploy nanti, Google mungkin minta izin tambahan ke Google Drive — klik izinkan, itu dipakai untuk simpan foto-nya.</li>
+        <li>Fitur upload foto ini butuh NotaX diakses lewat https (bukan file lokal) supaya jalan andal. Kalau masih tes dari file lokal, catatan tanpa foto tetap terkirim normal, yang ada foto mungkin gagal sampai kamu hosting NotaX-nya.</li>
+      </ol>
+      <div class="code-box" id="scriptCodeBox"></div>
+      <button class="btn btn-ghost btn-sm copy-btn" onclick="copyScriptCode()">📋 Salin Kode</button>
+    </details>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+// Penyimpanan pakai localStorage bawaan browser, supaya app ini jalan di hosting mana pun
+// (Vercel, domain sendiri, dst), tidak bergantung ke fitur khusus Claude.ai.
+const storage = {
+  async get(key){
+    const v = localStorage.getItem(key);
+    return v === null ? null : { key, value: v };
+  },
+  async set(key, value){
+    localStorage.setItem(key, value);
+    return { key, value };
+  }
+};
+
+let DATA = { records: [], options: { uang: ["Uang Pribadi","Uang PT"], project: [] }, projectLinks: {} };
+let noReceipt = false;
+let receiptImage = null;
+let modalProject = null;
+
+const APPS_SCRIPT_CODE = `function doGet(e) {
+  try {
+    var sheet = getSheet_();
+    if (e.parameter && e.parameter.data) {
+      // permintaan tambah baris lewat GET (dipakai saat foto tidak disertakan / tes koneksi)
+      appendCatatan_(JSON.parse(e.parameter.data));
+      return jsonOut_({status:'ok'});
+    }
+    // permintaan baca semua baris (dipakai fitur sync)
+    updateRingkasan_();
+    return jsonOut_({status:'ok', rows: readRows_()});
+  } catch (err) {
+    return jsonOut_({status:'error', message: err.toString()});
+  }
+}
+
+function doPost(e) {
+  try {
+    // permintaan tambah baris lewat POST (dipakai kalau ada foto bukti nota, karena ukurannya besar)
+    appendCatatan_(JSON.parse(e.postData.contents));
+    return jsonOut_({status:'ok'});
+  } catch (err) {
+    return jsonOut_({status:'error', message: err.toString()});
+  }
+}
+
+function appendCatatan_(data) {
+  var sheet = getSheet_();
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['ID','Tanggal','Beli Apa','Total','Pakai Uang','Project','Ada Bukti Nota','Link Foto Nota','Catatan','Waktu Simpan']);
+  }
+  var fotoUrl = '';
+  if (data.foto_base64) {
+    fotoUrl = simpanFotoKeDrive_(data.foto_base64, data.id);
+  }
+  sheet.appendRow([
+    data.id, data.tanggal, data.beli_apa, data.total, data.pakai_uang,
+    data.project, data.ada_bukti_nota, fotoUrl, data.catatan,
+    new Date()
+  ]);
+  updateRingkasan_();
+}
+
+function simpanFotoKeDrive_(base64DataUrl, id) {
+  try {
+    var parts = base64DataUrl.split(',');
+    var meta = parts[0];
+    var b64 = parts[1];
+    var mime = meta.substring(meta.indexOf(':') + 1, meta.indexOf(';'));
+    var bytes = Utilities.base64Decode(b64);
+    var blob = Utilities.newBlob(bytes, mime, 'nota-' + id + '.jpg');
+    var folder = getOrCreateFotoFolder_();
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return file.getUrl();
+  } catch (err) {
+    return 'GAGAL_UPLOAD_FOTO';
+  }
+}
+
+function getOrCreateFotoFolder_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var parents = DriveApp.getFileById(ss.getId()).getParents();
+  var parentFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+  var folderName = 'Foto Nota - ' + ss.getName();
+  var existing = parentFolder.getFoldersByName(folderName);
+  if (existing.hasNext()) return existing.next();
+  return parentFolder.createFolder(folderName);
+}
+
+function readRows_() {
+  var sheet = getSheet_();
+  var values = sheet.getDataRange().getValues();
+  var rows = [];
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    if (!row[0]) continue; // lewati baris tanpa ID (ditambah manual tanpa lewat NotaX)
+    rows.push({
+      id: String(row[0]),
+      tanggal: row[1],
+      beli_apa: row[2],
+      total: row[3],
+      pakai_uang: row[4],
+      project: row[5],
+      ada_bukti_nota: row[6],
+      foto_url: row[7],
+      catatan: row[8]
+    });
+  }
+  return rows;
+}
+
+function updateRingkasan_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var catatan = getSheet_();
+  var data = catatan.getDataRange().getValues();
+  var totals = {};
+  var grandTotal = 0;
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row[0]) continue; // lewati baris tanpa ID
+    var uang = row[4] || '(tidak diisi)';
+    var total = Number(row[3]) || 0;
+    totals[uang] = (totals[uang] || 0) + total;
+    grandTotal += total;
+  }
+  var ring = ss.getSheetByName('Ringkasan');
+  if (!ring) ring = ss.insertSheet('Ringkasan');
+  ring.clear();
+  ring.appendRow(['Pakai Uang', 'Total']);
+  Object.keys(totals).sort().forEach(function(k){
+    ring.appendRow([k, totals[k]]);
+  });
+  ring.appendRow(['Total Semua', grandTotal]);
+  ring.getRange(1, 1, 1, 2).setFontWeight('bold');
+  ring.getRange(ring.getLastRow(), 1, 1, 2).setFontWeight('bold');
+  ring.autoResizeColumns(1, 2);
+}
+
+function getSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Catatan');
+  if (!sheet) sheet = ss.insertSheet('Catatan');
+  return sheet;
+}
+
+function jsonOut_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}`;
+
+async function loadData(){
+  try{
+    const res = await storage.get('app-data');
+    if(res && res.value) DATA = JSON.parse(res.value);
+    if(!DATA.projectLinks) DATA.projectLinks = {};
+    // migrasi format lama (string url) -> object {sheetUrl, scriptUrl}
+    Object.keys(DATA.projectLinks).forEach(k=>{
+      if(typeof DATA.projectLinks[k] === 'string'){
+        DATA.projectLinks[k] = { sheetUrl: DATA.projectLinks[k], scriptUrl: '' };
+      }
+    });
+  }catch(e){ /* first run */ }
+  refreshDropdowns();
+  renderStats();
+  renderBoard();
+  updateProjectLinkRow();
+  updateUangDeleteRow();
+  document.getElementById('scriptCodeBox').textContent = APPS_SCRIPT_CODE;
+  const today = new Date();
+  document.getElementById('f_date').value = today.toISOString().slice(0,10);
+  document.getElementById('todayLabel').textContent = today.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
+  syncAllConfiguredProjects(true);
+}
+async function persist(){
+  try{ await storage.set('app-data', JSON.stringify(DATA)); }
+  catch(e){ console.error('gagal simpan', e); showToast('Gagal menyimpan data lokal.', 'err'); }
+}
+
+function switchView(v){
+  document.getElementById('viewHome').classList.toggle('active', v==='home');
+  document.getElementById('viewHistory').classList.toggle('active', v==='history');
+  document.getElementById('navHome').classList.toggle('active', v==='home');
+  document.getElementById('navHistory').classList.toggle('active', v==='history');
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const img = new Image();
+    img.onload = function(){
+      const maxW = 900;
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      receiptImage = canvas.toDataURL('image/jpeg', 0.72);
+      document.getElementById('preview').src = receiptImage;
+      document.getElementById('preview').style.display='block';
+      document.getElementById('dropLabel').style.display='none';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+function toggleNoReceipt(){
+  noReceipt = document.getElementById('noReceiptChk').checked;
+  const zone = document.getElementById('dropZone');
+  zone.classList.toggle('disabled', noReceipt);
+  if(noReceipt){
+    receiptImage = null;
+    document.getElementById('preview').style.display='none';
+    document.getElementById('dropLabel').style.display='block';
+  } else {
+    document.getElementById('dropLabel').style.display = receiptImage ? 'none' : 'block';
+  }
+}
+
+function resetForm(){
+  document.getElementById('f_desc').value='';
+  document.getElementById('f_date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('f_total').value='';
+  document.getElementById('f_note').value='';
+  document.getElementById('noReceiptChk').checked = false;
+  noReceipt = false;
+  receiptImage = null;
+  document.getElementById('preview').style.display='none';
+  document.getElementById('dropLabel').style.display='block';
+  document.getElementById('dropZone').classList.remove('disabled');
+  document.getElementById('fileInput').value='';
+}
+
+function escapeHtml(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtRp(n){ return 'Rp ' + (Number(n)||0).toLocaleString('id-ID'); }
+function fmtDate(d){ if(!d) return ''; const dt = new Date(d+'T00:00:00'); return dt.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}); }
+
+function showToast(msg, type){
+  const wrap = document.getElementById('toastWrap');
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' '+type : '');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>{ el.remove(); }, 4200);
+}
+
+function refreshDropdowns(){
+  fillSelect('f_uang', DATA.options.uang);
+  fillSelect('f_project', DATA.options.project);
+  fillFilterSelect('filterUang', DATA.options.uang);
+  fillFilterSelect('filterProject', DATA.options.project);
+}
+function fillSelect(id, list, optional){
+  const sel = document.getElementById(id);
+  const cur = sel.value;
+  sel.innerHTML = (optional ? '<option value="">— tidak diisi —</option>' : '<option value="">— pilih —</option>') +
+    list.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('') +
+    '<option value="__new__">+ Tambah baru...</option>';
+  if(list.includes(cur)) sel.value = cur;
+}
+function fillFilterSelect(id, list){
+  const sel = document.getElementById(id);
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">'+(id==='filterUang'?'Semua sumber uang':'Semua project')+'</option>' +
+    list.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+  sel.value = cur;
+}
+function handleNewOption(sel, key){
+  const box = document.getElementById('new'+key.charAt(0).toUpperCase()+key.slice(1)+'Box');
+  box.style.display = sel.value==='__new__' ? 'flex' : 'none';
+  if(key==='project') updateProjectLinkRow();
+}
+function confirmNewOption(key){
+  const input = document.getElementById('new'+key.charAt(0).toUpperCase()+key.slice(1)+'Input');
+  const val = input.value.trim();
+  if(!val) return;
+  if(!DATA.options[key].includes(val)) DATA.options[key].push(val);
+  refreshDropdowns();
+  document.getElementById('f_'+key).value = val;
+  document.getElementById('new'+key.charAt(0).toUpperCase()+key.slice(1)+'Box').style.display='none';
+  input.value='';
+  persist();
+  if(key==='project'){
+    updateProjectLinkRow();
+    openLinkModal();
+  }
+}
+
+function updateUangDeleteRow(){
+  const val = document.getElementById('f_uang').value;
+  const row = document.getElementById('uangDeleteRow');
+  row.style.display = (val && val !== '__new__') ? 'flex' : 'none';
+}
+
+async function deleteUangOption(){
+  const val = document.getElementById('f_uang').value;
+  if(!val || val==='__new__') return;
+  const ok = confirm(
+    'Hapus opsi "'+val+'" dari daftar Pakai Uang Siapa?\n\n' +
+    'Catatan yang sudah tersimpan dengan sumber uang ini TIDAK akan terhapus, cuma opsi ini nggak lagi muncul di dropdown pilihan.'
+  );
+  if(!ok) return;
+  DATA.options.uang = DATA.options.uang.filter(u => u !== val);
+  await persist();
+  refreshDropdowns();
+  document.getElementById('f_uang').value = '';
+  updateUangDeleteRow();
+  renderStats();
+  showToast('Opsi "'+val+'" dihapus dari daftar Pakai Uang Siapa.', 'ok');
+}
+
+function getLinkCfg(proj){
+  return DATA.projectLinks[proj] || { sheetUrl:'', scriptUrl:'' };
+}
+
+function updateProjectLinkRow(){
+  const proj = document.getElementById('f_project').value;
+  const row = document.getElementById('projectLinkRow');
+  if(!proj || proj==='__new__'){ row.style.display='none'; return; }
+  row.style.display='flex';
+  const cfg = getLinkCfg(proj);
+  const dot = document.getElementById('projectSyncDot');
+  const textEl = document.getElementById('projectLinkText');
+  if(cfg.scriptUrl){
+    dot.className = 'sync-dot on';
+    textEl.textContent = 'Sinkron otomatis aktif untuk "'+proj+'"';
+  } else if(cfg.sheetUrl){
+    dot.className = 'sync-dot off';
+    textEl.textContent = 'Link ada, tapi kirim otomatis belum diatur';
+  } else {
+    dot.className = 'sync-dot off';
+    textEl.textContent = 'Sinkronisasi belum diatur untuk "'+proj+'"';
+  }
+}
+document.getElementById('f_project').addEventListener('change', updateProjectLinkRow);
+
+function openLinkModal(){
+  const proj = document.getElementById('f_project').value;
+  if(!proj || proj==='__new__'){ showToast('Pilih atau tambah project dulu.', 'err'); return; }
+  modalProject = proj;
+  const cfg = getLinkCfg(proj);
+  document.getElementById('linkModalTitle').textContent = 'Atur Spreadsheet: ' + proj;
+  document.getElementById('m_sheetUrl').value = cfg.sheetUrl || '';
+  document.getElementById('m_scriptUrl').value = cfg.scriptUrl || '';
+  document.getElementById('modalStatus').innerHTML = '';
+  document.getElementById('linkModal').classList.add('open');
+}
+async function deleteProject(){
+  if(!modalProject) return;
+  const ok = confirm(
+    'Hapus project "'+modalProject+'" dari daftar NotaX?\n\n' +
+    '- Spreadsheet asli di Google Drive TIDAK akan terhapus.\n' +
+    '- Catatan yang sudah tersimpan di Riwayat Belanja TIDAK akan terhapus, cuma nanti project ini tidak lagi muncul di dropdown pilihan.\n\n' +
+    'Lanjutkan?'
+  );
+  if(!ok) return;
+  const proj = modalProject;
+  DATA.options.project = DATA.options.project.filter(p => p !== proj);
+  delete DATA.projectLinks[proj];
+  await persist();
+  closeLinkModal();
+  document.getElementById('f_project').value = '';
+  refreshDropdowns();
+  updateProjectLinkRow();
+  renderBoard();
+  showToast('Project "'+proj+'" dihapus dari daftar NotaX.', 'ok');
+}
+
+function closeLinkModal(){
+  document.getElementById('linkModal').classList.remove('open');
+}
+async function saveLinkModal(){
+  if(!modalProject) return;
+  const sheetUrl = document.getElementById('m_sheetUrl').value.trim();
+  const scriptUrl = document.getElementById('m_scriptUrl').value.trim();
+  DATA.projectLinks[modalProject] = { sheetUrl, scriptUrl };
+  await persist();
+  updateProjectLinkRow();
+  closeLinkModal();
+  showToast('Pengaturan spreadsheet untuk "'+modalProject+'" disimpan.', 'ok');
+}
+function copyScriptCode(){
+  navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(()=>{
+    showToast('Kode disalin. Tempel di Apps Script editor.', 'ok');
+  }).catch(()=>{
+    showToast('Gagal menyalin otomatis, silakan salin manual dari kotak kode.', 'err');
+  });
+}
+
+async function testSendToSheet(){
+  const scriptUrl = document.getElementById('m_scriptUrl').value.trim();
+  const statusEl = document.getElementById('modalStatus');
+  if(!scriptUrl){ statusEl.innerHTML = '<div class="status-line err">Isi dulu Apps Script Web App URL-nya.</div>'; return; }
+  statusEl.innerHTML = '<div class="status-line info">Mengirim data percobaan...</div>';
+  const payload = {
+    id: 'TEST-' + Date.now(),
+    tanggal: new Date().toISOString().slice(0,10),
+    beli_apa: '(tes koneksi dari NotaX - ' + new Date().toLocaleTimeString('id-ID') + ')',
+    total: 0,
+    pakai_uang: '-',
+    project: modalProject || '-',
+    ada_bukti_nota: 'Tidak',
+    catatan: 'Baris ini boleh dihapus, ini cuma tes koneksi.'
+  };
+  const result = await sendToScript(scriptUrl, payload);
+  if(result === 'ok'){
+    statusEl.innerHTML = '<div class="status-line ok">✓ Berhasil dikonfirmasi! Cek spreadsheet-nya, harusnya ada baris tes baru.</div>';
+  } else if(result === 'unknown'){
+    statusEl.innerHTML = '<div class="status-line info">Data sudah dikirim. Browser tidak bisa mengonfirmasi otomatis, jadi <b>cek langsung ke tab "Catatan" di spreadsheet</b> — cari baris "(tes koneksi dari NotaX - '+new Date().toLocaleTimeString('id-ID')+')". Kalau ada, berarti berhasil.</div>';
+  } else {
+    statusEl.innerHTML = '<div class="status-line err">Gagal terkirim. Cek lagi URL-nya, dan pastikan deployment diatur "Anyone" bisa akses.</div>';
+  }
+}
+
+async function sendToScript(scriptUrl, payload){
+  // Coba POST dulu — dibutuhkan kalau ada foto (ukurannya besar, tidak muat di URL),
+  // dan ini jalan normal begitu NotaX diakses lewat https (bukan file lokal).
+  try{
+    const res = await fetch(scriptUrl, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify(payload)
+    });
+    if(res.ok){
+      try{
+        const json = await res.json();
+        return json.status === 'ok' ? 'ok' : 'error';
+      }catch(e){ return 'ok'; }
+    }
+  }catch(e){ /* lanjut ke fallback di bawah */ }
+
+  // Fallback (dipakai kalau tidak ada foto, atau lagi dibuka dari file lokal)
+  if(!payload.foto_base64){
+    const sep = scriptUrl.includes('?') ? '&' : '?';
+    const url = scriptUrl + sep + 'data=' + encodeURIComponent(JSON.stringify(payload)) + '&_=' + Date.now();
+    try{
+      const res2 = await fetch(url, { method:'GET', cache:'no-store' });
+      if(res2.ok){
+        try{
+          const json2 = await res2.json();
+          return json2.status === 'ok' ? 'ok' : 'error';
+        }catch(e){ return 'ok'; }
+      }
+    }catch(e2){ /* lanjut ke iframe */ }
+    return await sendViaIframe_(url);
+  }
+  return 'error';
+}
+
+function sendViaIframe_(url){
+  return new Promise((resolve)=>{
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    let done = false;
+    const finish = (status)=>{
+      if(done) return;
+      done = true;
+      setTimeout(()=>{ if(iframe.parentNode) iframe.remove(); }, 300);
+      resolve(status);
+    };
+    iframe.onload = ()=> finish('unknown'); // berhasil dimuat, tapi isinya cross-origin jadi tidak bisa dibaca
+    iframe.onerror = ()=> finish('error');
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    setTimeout(()=> finish('unknown'), 7000); // jaga-jaga kalau event onload tidak terpicu
+  });
+}
+
+function formatSheetDate_(v){
+  if(!v) return '';
+  if(typeof v === 'string' && v.includes('T')) return v.slice(0,10);
+  if(typeof v === 'string') return v;
+  return '';
+}
+
+async function syncProjectFromSheet(project){
+  const cfg = getLinkCfg(project);
+  if(!cfg.scriptUrl) return {status:'no-config'};
+  try{
+    const res = await fetch(cfg.scriptUrl, { method:'GET' });
+    if(!res.ok) return {status:'error'};
+    const json = await res.json();
+    if(json.status !== 'ok') return {status:'error'};
+    const sheetRows = json.rows || [];
+    const sheetIds = new Set(sheetRows.map(r=>r.id));
+    let changed = false;
+
+    const before = DATA.records.length;
+    DATA.records = DATA.records.filter(r=>{
+      if(r.project !== project) return true;
+      if(!r.synced) return true; // belum pernah kekonfirmasi terkirim, jangan disentuh dari sini
+      return sheetIds.has(r.id);
+    });
+    if(DATA.records.length !== before) changed = true;
+
+    sheetRows.forEach(row=>{
+      const local = DATA.records.find(r=>r.id === row.id);
+      if(!local) return;
+      const newTotal = Number(row.total)||0;
+      const newDate = formatSheetDate_(row.tanggal) || local.date;
+      const newDesc = row.beli_apa || '';
+      const newUang = row.pakai_uang || local.uang;
+      const newNote = row.catatan || '';
+      if(local.desc!==newDesc || local.total!==newTotal || local.uang!==newUang || local.note!==newNote || local.date!==newDate){
+        local.desc = newDesc; local.total = newTotal; local.uang = newUang;
+        local.note = newNote; local.date = newDate;
+        changed = true;
+      }
+    });
+
+    if(changed) await persist();
+    return {status:'ok', changed};
+  }catch(e){
+    console.error('sync gagal', e);
+    return {status:'error'};
+  }
+}
+
+async function syncAllConfiguredProjects(silent){
+  const projects = Object.keys(DATA.projectLinks).filter(p=>DATA.projectLinks[p].scriptUrl);
+  if(projects.length===0){ if(!silent) showToast('Belum ada project dengan sinkron otomatis diatur.', 'err'); return; }
+  if(!silent) showToast('Menyinkronkan dari spreadsheet...', 'info');
+  let anyChanged=false, anyError=false;
+  for(const p of projects){
+    const r = await syncProjectFromSheet(p);
+    if(r.status==='error') anyError=true;
+    if(r.changed) anyChanged=true;
+  }
+  refreshDropdowns();
+  renderStats();
+  renderBoard();
+  if(!silent){
+    if(anyError) showToast('Sync baca-balik butuh NotaX di-hosting (https), belum jalan dari file lokal. Fitur kirim nota tetap jalan normal.', 'err');
+    else if(anyChanged) showToast('✓ Riwayat diperbarui sesuai perubahan di spreadsheet.', 'ok');
+    else showToast('Sudah sinkron, tidak ada perubahan baru.', 'ok');
+  }
+}
+
+function handleSheetBtn(){
+  const proj = document.getElementById('filterProject').value;
+  if(!proj){ showToast('Pilih project dulu di filter untuk membuka spreadsheet-nya.', 'err'); return; }
+  const cfg = getLinkCfg(proj);
+  if(cfg.sheetUrl){ window.open(cfg.sheetUrl, '_blank'); }
+  else { showToast('Belum ada link spreadsheet untuk project ini. Atur lewat form Papan Nota.', 'err'); }
+}
+
+function openRecordSheet(proj){
+  const cfg = getLinkCfg(proj);
+  if(cfg.sheetUrl){ window.open(cfg.sheetUrl,'_blank'); }
+  else { showToast('Belum ada link spreadsheet untuk project "'+proj+'".', 'err'); }
+}
+
+async function saveRecord(){
+  const uang = document.getElementById('f_uang').value;
+  const project = document.getElementById('f_project').value;
+  const total = Number(document.getElementById('f_total').value);
+  if(!total || total<=0){ showToast('Isi dulu total harga di nota.', 'err'); return; }
+  if(!uang || uang==='__new__'){ showToast('Pilih dulu pakai uang siapa.', 'err'); return; }
+  if(!project || project==='__new__'){ showToast('Pilih dulu untuk project/keperluan apa.', 'err'); return; }
+  if(!noReceipt && !receiptImage){ showToast('Upload bukti nota, atau centang "Tidak ada bukti nota".', 'err'); return; }
+
+  const rec = {
+    id: 'r'+Date.now(),
+    date: document.getElementById('f_date').value,
+    desc: document.getElementById('f_desc').value.trim(),
+    total: total,
+    uang: uang,
+    project: project,
+    note: document.getElementById('f_note').value.trim(),
+    hasReceipt: !noReceipt,
+    receiptImage: noReceipt ? null : receiptImage,
+    createdAt: Date.now(),
+    synced: false
+  };
+  DATA.records.unshift(rec);
+  await persist();
+  resetForm();
+  renderStats();
+  renderBoard();
+  refreshDropdowns();
+
+  const cfg = getLinkCfg(project);
+  if(cfg.scriptUrl){
+    showToast('Tersimpan. Mengirim ke spreadsheet...', 'info');
+    const result = await sendToScript(cfg.scriptUrl, {
+      id: rec.id, tanggal: rec.date, beli_apa: rec.desc, total: rec.total, pakai_uang: rec.uang,
+      project: rec.project, ada_bukti_nota: rec.hasReceipt?'Ya':'Tidak', catatan: rec.note,
+      foto_base64: (rec.hasReceipt && rec.receiptImage) ? rec.receiptImage : ''
+    });
+    rec.synced = (result === 'ok' || result === 'unknown');
+    if(result === 'ok') showToast('✓ Tersimpan & masuk ke spreadsheet "'+project+'".', 'ok');
+    else if(result === 'unknown') showToast('Tersimpan & terkirim (cek manual di spreadsheet).', 'ok');
+    else showToast('Tersimpan di NotaX, tapi GAGAL kirim ke spreadsheet. Cek link Apps Script-nya.', 'err');
+    await persist();
+    renderBoard();
+  } else {
+    showToast('✓ Tersimpan. Sinkron otomatis belum diatur untuk project ini.', 'ok');
+  }
+}
+
+async function deleteRecord(id){
+  if(!confirm('Hapus catatan ini? (catatan ini cuma dihapus dari NotaX, tidak menghapus baris yang sudah masuk ke spreadsheet)')) return;
+  DATA.records = DATA.records.filter(r=>r.id!==id);
+  await persist();
+  renderStats();
+  renderBoard();
+}
+
+function walletIcon(){
+  return `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>`;
+}
+function renderStats(){
+  const byUang = {};
+  DATA.records.forEach(r=>{ byUang[r.uang] = (byUang[r.uang]||0) + r.total; });
+  let html = '';
+  Object.entries(byUang).forEach(([k,v])=>{
+    html += `<div class="stat-card"><div><div class="label">${escapeHtml(k)}</div><div class="val">${fmtRp(v)}</div></div><div class="badge-ico">${walletIcon()}</div></div>`;
+  });
+  document.getElementById('statsBar').innerHTML = html;
+}
+
+function renderBoard(){
+  const fu = document.getElementById('filterUang').value;
+  const fp = document.getElementById('filterProject').value;
+  let list = DATA.records.filter(r => (!fu || r.uang===fu) && (!fp || r.project===fp));
+  document.getElementById('boardCount').textContent = list.length ? ` (${list.length})` : '';
+  const board = document.getElementById('board');
+  if(list.length===0){
+    board.innerHTML = `<div class="empty">
+      <svg class="icon-lg" style="width:30px;height:30px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>
+      <div class="title">Belum ada nota tercatat.</div>
+      Setiap catatan yang kamu simpan akan muncul di sini.
+    </div>`;
+    return;
+  }
+
+  board.innerHTML = list.map(r=>{
+    const cfg = getLinkCfg(r.project);
+    let syncNote = '';
+    if(cfg.scriptUrl){
+      syncNote = r.synced
+        ? `<div class="item-sync"><span class="sync-dot on"></span> Sudah masuk ke spreadsheet</div>`
+        : `<div class="item-sync"><span class="sync-dot off"></span> Belum terkonfirmasi terkirim</div>`;
+    }
+    return `
+    <div class="item">
+      <div class="item-top">
+        <div>
+          <div class="item-desc">${escapeHtml(r.desc || '(tanpa keterangan)')}</div>
+          <div class="item-date">${fmtDate(r.date)}</div>
+        </div>
+        <div class="item-amt">${fmtRp(r.total)}</div>
+      </div>
+      ${r.hasReceipt && r.receiptImage ? `<img class="item-thumb" src="${r.receiptImage}" onclick="openLightbox('${r.receiptImage}')">` : `<div class="no-receipt">🚫 Tidak ada bukti nota</div>`}
+      ${r.note ? `<div class="item-note">${escapeHtml(r.note)}</div>` : ''}
+      <div class="badges">
+        <span class="badge uang">${escapeHtml(r.uang)}</span>
+        <span class="badge project">${escapeHtml(r.project)}</span>
+      </div>
+      ${syncNote}
+      <div class="item-actions">
+        <button class="sheet-link-btn" onclick="openRecordSheet('${escapeHtml(r.project).replace(/'/g,"\\'")}')">
+          <svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.5-1.5"/></svg>
+          Spreadsheet
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="deleteRecord('${r.id}')">Hapus</button>
+      </div>
+    </div>
+  `;}).join('');
+}
+
+function openLightbox(src){
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+loadData();
+</script>
+</body>
+</html>
