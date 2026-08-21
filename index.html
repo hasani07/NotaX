@@ -279,7 +279,7 @@
       <div class="name">Nota<span>X</span></div>
       <p>Catat, kelola, dan kontrol setiap pengeluaran proyek dengan mudah.</p>
     </div>
-    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v5-seq-chunk</span></div>
+    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v7-small-photo</span></div>
   </div>
 </div>
 
@@ -553,6 +553,17 @@ const APPS_SCRIPT_CODE = `function doGet(e) {
   }
 }
 
+function doPost(e) {
+  try {
+    var raw = (e.parameter && e.parameter.payload) ? e.parameter.payload : (e.postData ? e.postData.contents : null);
+    var data = JSON.parse(raw);
+    appendCatatan_(data);
+    return jsonOut_({status:'ok'});
+  } catch (err) {
+    return jsonOut_({status:'error', message: err.toString()});
+  }
+}
+
 function safeParse_(s) {
   try { return JSON.parse(s); } catch (e) { return 'PARSE_ERROR: ' + e.toString(); }
 }
@@ -737,14 +748,14 @@ document.getElementById('fileInput').addEventListener('change', function(e){
   reader.onload = function(ev){
     const img = new Image();
     img.onload = function(){
-      const maxW = 700;
+      const maxW = 380;
       const scale = Math.min(1, maxW / img.width);
       const canvas = document.createElement('canvas');
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      receiptImage = canvas.toDataURL('image/jpeg', 0.55);
+      receiptImage = canvas.toDataURL('image/jpeg', 0.4);
       document.getElementById('preview').src = receiptImage;
       document.getElementById('preview').style.display='block';
       document.getElementById('dropLabel').style.display='none';
@@ -963,42 +974,9 @@ async function testSendToSheet(){
 }
 
 async function sendToScript(scriptUrl, payload){
-  if(payload.foto_base64){
-    return await sendPhotoChunks_(scriptUrl, payload);
-  }
   const sep = scriptUrl.includes('?') ? '&' : '?';
   const url = scriptUrl + sep + 'data=' + encodeURIComponent(JSON.stringify(payload)) + '&_=' + Date.now();
   return await sendViaIframe_(url);
-}
-
-async function sendPhotoChunks_(scriptUrl, payload){
-  const id = payload.id;
-  const foto = payload.foto_base64;
-  const meta = Object.assign({}, payload);
-  delete meta.foto_base64;
-  const sep = scriptUrl.includes('?') ? '&' : '?';
-
-  // 1. potong foto, kirim SATU-SATU BERURUTAN (bukan paralel) biar setiap potongan
-  //    dipastikan sampai dulu sebelum lanjut ke potongan berikutnya — lebih lambat tapi lebih andal
-  const chunkSize = 1500;
-  const total = Math.max(1, Math.ceil(foto.length / chunkSize));
-  showToast('Mengirim foto (0/'+total+')...', 'info');
-
-  for(let i=0;i<total;i++){
-    const chunk = foto.slice(i*chunkSize, (i+1)*chunkSize);
-    const url = scriptUrl + sep + 'action=chunk&id=' + encodeURIComponent(id) + '&idx=' + i + '&total=' + total + '&chunk=' + encodeURIComponent(chunk) + '&_=' + Date.now() + '_' + i;
-    await sendViaIframe_(url);
-    if(total > 6 && (i+1) % Math.max(1, Math.ceil(total/5)) === 0){
-      showToast('Mengirim foto ('+(i+1)+'/'+total+')...', 'info');
-    }
-  }
-
-  // 2. semua potongan sudah terkirim; kirim data teksnya BARENG di permintaan terakhir ini
-  const finishUrl = scriptUrl + sep + 'action=finish&id=' + encodeURIComponent(id) + '&total=' + total +
-    '&data=' + encodeURIComponent(JSON.stringify(meta)) + '&_=' + Date.now();
-  await sendViaIframe_(finishUrl);
-
-  return 'unknown'; // tidak bisa dikonfirmasi otomatis (batasan CORS), tapi cara ini terbukti sampai ke server
 }
 
 function sendViaIframe_(url){
