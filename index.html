@@ -186,7 +186,33 @@
   .board-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;}
   @media(max-width:820px){ .board-grid{grid-template-columns:1fr;} }
   @media(max-width:900px){ .main{padding:28px 20px 60px;} }
-  @media(max-width:700px){ .sidebar{display:none;} .main{margin-left:0;} }
+
+  @media(max-width:700px){
+    .sidebar{
+      position:fixed; top:0; left:0; right:0; bottom:auto; width:100%; height:auto;
+      flex-direction:row; align-items:center; justify-content:space-between;
+      padding:10px 14px; z-index:30; overflow-x:auto;
+    }
+    .brand{margin-bottom:0; flex-shrink:0;}
+    .brand-name{font-size:15px;}
+    .brand-mark{width:28px;height:28px;border-radius:8px;}
+    .sidebar-footer{display:none;}
+    .nav-item{
+      margin-bottom:0; padding:8px 10px; font-size:12px; white-space:nowrap; gap:6px;
+    }
+    .main{margin-left:0; margin-top:56px; padding:18px 14px 50px;}
+    .main-header{padding:20px 18px; border-radius:14px;}
+    .main-header h1{font-size:21px;}
+    .main-header p{font-size:12.5px;}
+    .header-illustration{display:none;}
+    .card{padding:20px 16px 24px;}
+    .card-header{flex-wrap:wrap; gap:10px;}
+    .stat-card{min-width:130px; flex:1 1 130px;}
+    .board-toolbar{align-items:flex-start;}
+    .board-filters{width:100%;}
+    .board-filters select{flex:1 1 auto; min-width:0;}
+    .modal{padding:20px 18px 22px;}
+  }
 
   .item{
     background:#fbfbfa;border:1px solid var(--line);border-radius:13px;padding:16px 17px;
@@ -302,8 +328,6 @@
     </svg>
   </div>
 
-  <div class="stats" id="statsBar"></div>
-
   <!-- ===================== VIEW: HOME ===================== -->
   <div class="view active" id="viewHome">
     <div class="card">
@@ -415,6 +439,7 @@
 
   <!-- ===================== VIEW: HISTORY ===================== -->
   <div class="view" id="viewHistory">
+    <div class="stats" id="statsBar"></div>
     <div class="card">
       <div class="board-toolbar">
         <div class="card-header-left">
@@ -578,16 +603,9 @@ function appendCatatan_(data) {
   }
   sheet.appendRow([
     data.id, data.tanggal, data.beli_apa, data.total, data.pakai_uang,
-    data.project, data.ada_bukti_nota, '', data.catatan,
+    data.project, data.ada_bukti_nota, data.foto_url || '', data.catatan,
     new Date()
   ]);
-  var lastRow = sheet.getLastRow();
-  if (data.foto_url) {
-    var cell = sheet.getRange(lastRow, 8);
-    cell.setFormula('=IMAGE("' + data.foto_url + '")');
-    cell.setNote(data.foto_url); // link asli tetap tersimpan, muncul saat cell di-hover
-    sheet.setRowHeight(lastRow, 90);
-  }
   updateRingkasan_();
 }
 
