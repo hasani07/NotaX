@@ -493,7 +493,8 @@
         <li>Sudah pernah deploy sebelumnya (kode versi lama)? Update kode script-nya ke versi ini lagi, lalu <b>Deploy → Manage deployments</b> → klik ikon pensil di deployment yang ada → di "Version" pilih "New version" → klik <b>Deploy</b>. Cara ini bikin URL-nya tetap sama, jadi kamu tidak perlu ganti URL di NotaX lagi.</li>
         <li>Script ini juga otomatis bikin tab <b>"Ringkasan"</b> berisi total belanja per "Pakai Uang" (mis. total Uang Hasani, total Uang PT) + total semuanya, yang selalu update tiap ada nota baru masuk.</li>
         <li><b>Baru:</b> kalau nota-nya ada foto bukti, sekarang otomatis di-upload ke folder Google Drive (satu folder sama dengan spreadsheet-nya), dan link-nya nempel di kolom <b>"Link Foto Nota"</b>. Saat proses deploy nanti, Google mungkin minta izin tambahan ke Google Drive — klik izinkan, itu dipakai untuk simpan foto-nya.</li>
-        <li>Fitur upload foto ini butuh NotaX diakses lewat https (bukan file lokal) supaya jalan andal. Kalau masih tes dari file lokal, catatan tanpa foto tetap terkirim normal, yang ada foto mungkin gagal sampai kamu hosting NotaX-nya.</li>
+        <li>Foto dikirim bertahap (dipecah jadi beberapa bagian kecil), jadi proses simpan nota yang ada fotonya makan waktu beberapa detik lebih lama dari nota tanpa foto. Ini normal.</li>
+        <li><b>Penting:</b> pastikan di Deploy → Manage deployments → Edit, kolom <b>"Execute as"</b> diisi <b>"Me"</b> dan <b>"Who has access"</b> diisi <b>"Anyone"</b> (bukan "Anyone with Google account") — kalau salah satu ini beda, permintaan dari NotaX akan ditolak.</li>
       </ol>
       <div class="code-box" id="scriptCodeBox"></div>
       <button class="btn btn-ghost btn-sm copy-btn" onclick="copyScriptCode()">📋 Salin Kode</button>
@@ -524,13 +525,18 @@ let modalProject = null;
 
 const APPS_SCRIPT_CODE = `function doGet(e) {
   try {
-    var sheet = getSheet_();
-    if (e.parameter && e.parameter.data) {
-      // permintaan tambah baris lewat GET (dipakai saat foto tidak disertakan / tes koneksi)
-      appendCatatan_(JSON.parse(e.parameter.data));
+    var p = e.parameter || {};
+    if (p.action === 'meta') {
+      CacheService.getScriptCache().put('meta_' + p.id, p.data, 600);
       return jsonOut_({status:'ok'});
     }
-    // permintaan baca semua baris (dipakai fitur sync)
+    if (p.action === 'chunk') {
+      return handleChunk_(p);
+    }
+    if (p.data) {
+      appendCatatan_(JSON.parse(p.data));
+      return jsonOut_({status:'ok'});
+    }
     updateRingkasan_();
     return jsonOut_({status:'ok', rows: readRows_()});
   } catch (err) {
@@ -538,14 +544,25 @@ const APPS_SCRIPT_CODE = `function doGet(e) {
   }
 }
 
-function doPost(e) {
-  try {
-    // permintaan tambah baris lewat POST (dipakai kalau ada foto bukti nota, karena ukurannya besar)
-    appendCatatan_(JSON.parse(e.postData.contents));
-    return jsonOut_({status:'ok'});
-  } catch (err) {
-    return jsonOut_({status:'error', message: err.toString()});
+function handleChunk_(p) {
+  var cache = CacheService.getScriptCache();
+  var idx = Number(p.idx);
+  var total = Number(p.total);
+  cache.put('chunk_' + p.id + '_' + idx, p.chunk, 600);
+  if (idx === total - 1) {
+    var full = '';
+    for (var i = 0; i < total; i++) {
+      full += cache.get('chunk_' + p.id + '_' + i) || '';
+      cache.remove('chunk_' + p.id + '_' + i);
+    }
+    var metaStr = cache.get('meta_' + p.id);
+    var data = metaStr ? JSON.parse(metaStr) : { id: p.id };
+    data.foto_base64 = full;
+    appendCatatan_(data);
+    cache.remove('meta_' + p.id);
+    return jsonOut_({status:'ok', done:true});
   }
+  return jsonOut_({status:'ok', done:false});
 }
 
 function appendCatatan_(data) {
@@ -694,14 +711,14 @@ document.getElementById('fileInput').addEventListener('change', function(e){
   reader.onload = function(ev){
     const img = new Image();
     img.onload = function(){
-      const maxW = 900;
+      const maxW = 700;
       const scale = Math.min(1, maxW / img.width);
       const canvas = document.createElement('canvas');
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      receiptImage = canvas.toDataURL('image/jpeg', 0.72);
+      receiptImage = canvas.toDataURL('image/jpeg', 0.55);
       document.getElementById('preview').src = receiptImage;
       document.getElementById('preview').style.display='block';
       document.getElementById('dropLabel').style.display='none';
@@ -920,38 +937,48 @@ async function testSendToSheet(){
 }
 
 async function sendToScript(scriptUrl, payload){
-  // Coba POST dulu — dibutuhkan kalau ada foto (ukurannya besar, tidak muat di URL),
-  // dan ini jalan normal begitu NotaX diakses lewat https (bukan file lokal).
+  if(payload.foto_base64){
+    return await sendPhotoChunks_(scriptUrl, payload);
+  }
+  const sep = scriptUrl.includes('?') ? '&' : '?';
+  const url = scriptUrl + sep + 'data=' + encodeURIComponent(JSON.stringify(payload)) + '&_=' + Date.now();
   try{
-    const res = await fetch(scriptUrl, {
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify(payload)
-    });
+    const res = await fetch(url, { method:'GET', cache:'no-store' });
     if(res.ok){
       try{
         const json = await res.json();
         return json.status === 'ok' ? 'ok' : 'error';
       }catch(e){ return 'ok'; }
     }
-  }catch(e){ /* lanjut ke fallback di bawah */ }
+  }catch(e){ /* lanjut ke fallback iframe */ }
+  return await sendViaIframe_(url);
+}
 
-  // Fallback (dipakai kalau tidak ada foto, atau lagi dibuka dari file lokal)
-  if(!payload.foto_base64){
-    const sep = scriptUrl.includes('?') ? '&' : '?';
-    const url = scriptUrl + sep + 'data=' + encodeURIComponent(JSON.stringify(payload)) + '&_=' + Date.now();
-    try{
-      const res2 = await fetch(url, { method:'GET', cache:'no-store' });
-      if(res2.ok){
-        try{
-          const json2 = await res2.json();
-          return json2.status === 'ok' ? 'ok' : 'error';
-        }catch(e){ return 'ok'; }
-      }
-    }catch(e2){ /* lanjut ke iframe */ }
-    return await sendViaIframe_(url);
+async function sendPhotoChunks_(scriptUrl, payload){
+  const id = payload.id;
+  const foto = payload.foto_base64;
+  const meta = Object.assign({}, payload);
+  delete meta.foto_base64;
+  const sep = scriptUrl.includes('?') ? '&' : '?';
+
+  // 1. kirim data teksnya dulu, disimpan sementara di server
+  try{
+    await fetch(scriptUrl + sep + 'action=meta&id=' + encodeURIComponent(id) + '&data=' + encodeURIComponent(JSON.stringify(meta)) + '&_=' + Date.now(), { cache:'no-store' });
+  }catch(e){ /* diabaikan, permintaan tetap terkirim ke server meski dibaca browser gagal */ }
+
+  // 2. potong foto jadi bagian-bagian kecil, kirim satu-satu berurutan
+  const chunkSize = 4000;
+  const total = Math.max(1, Math.ceil(foto.length / chunkSize));
+  showToast('Mengirim foto (0/'+total+')...', 'info');
+  for(let i=0;i<total;i++){
+    const chunk = foto.slice(i*chunkSize, (i+1)*chunkSize);
+    const url = scriptUrl + sep + 'action=chunk&id=' + encodeURIComponent(id) + '&idx=' + i + '&total=' + total + '&chunk=' + encodeURIComponent(chunk) + '&_=' + Date.now();
+    try{ await fetch(url, { cache:'no-store' }); }catch(e){ /* tetap lanjut, request tetap terkirim ke server */ }
+    if(total > 6 && (i % Math.ceil(total/4) === 0)){
+      showToast('Mengirim foto ('+(i+1)+'/'+total+')...', 'info');
+    }
   }
-  return 'error';
+  return 'unknown'; // tidak bisa dikonfirmasi otomatis (batasan CORS), tapi kemungkinan besar berhasil
 }
 
 function sendViaIframe_(url){
