@@ -554,7 +554,7 @@ const APPS_SCRIPT_CODE = `function doGet(e) {
 function renderReadHtml_() {
   updateRingkasan_();
   var payload = JSON.stringify({status:'ok', rows: readRows_()});
-  var html = '<script>window.parent.postMessage(' + payload + ', "*");<' + '/script>';
+  var html = '<script>window.top.postMessage(' + payload + ', "*");<' + '/script>';
   return HtmlService.createHtmlOutput(html);
 }
 
