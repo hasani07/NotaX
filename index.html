@@ -540,6 +540,9 @@ const APPS_SCRIPT_CODE = `function doGet(e) {
     if (p.action === 'read') {
       return renderReadHtml_();
     }
+    if (p.action === 'delete') {
+      return handleDelete_(p);
+    }
     if (p.data) {
       appendCatatan_(JSON.parse(p.data));
       return jsonOut_({status:'ok'});
@@ -549,6 +552,19 @@ const APPS_SCRIPT_CODE = `function doGet(e) {
   } catch (err) {
     return jsonOut_({status:'error', message: err.toString()});
   }
+}
+
+function handleDelete_(p) {
+  var sheet = getSheet_();
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === String(p.id)) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  updateRingkasan_();
+  return jsonOut_({status:'ok'});
 }
 
 function renderReadHtml_() {
@@ -1170,11 +1186,19 @@ async function saveRecord(){
 }
 
 async function deleteRecord(id){
-  if(!confirm('Hapus catatan ini? (catatan ini cuma dihapus dari NotaX, tidak menghapus baris yang sudah masuk ke spreadsheet)')) return;
+  if(!confirm('Hapus catatan ini? Kalau project ini sudah tersambung spreadsheet, baris yang sesuai di spreadsheet juga otomatis ikut dihapus.')) return;
+  const rec = DATA.records.find(r => r.id === id);
   DATA.records = DATA.records.filter(r=>r.id!==id);
   await persist();
   renderStats();
   renderBoard();
+  if(rec){
+    const cfg = getLinkCfg(rec.project);
+    if(cfg.scriptUrl){
+      const sep = cfg.scriptUrl.includes('?') ? '&' : '?';
+      sendViaIframe_(cfg.scriptUrl + sep + 'action=delete&id=' + encodeURIComponent(id) + '&_=' + Date.now());
+    }
+  }
 }
 
 function walletIcon(){
