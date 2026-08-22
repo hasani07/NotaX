@@ -358,7 +358,7 @@
           <label>Total harga di nota</label>
           <div class="rp-wrap">
             <div class="rp-prefix">Rp</div>
-            <input type="number" id="f_total" placeholder="0">
+            <input type="text" inputmode="numeric" id="f_total" placeholder="0">
           </div>
         </div>
       </div>
@@ -710,6 +710,12 @@ function switchView(v){
   document.getElementById('navHistory').classList.toggle('active', v==='history');
 }
 
+document.getElementById('f_total').addEventListener('input', function(e){
+  let digits = e.target.value.replace(/\D/g, '');
+  digits = digits.replace(/^0+(?=\d)/, '');
+  e.target.value = digits ? Number(digits).toLocaleString('id-ID') : '';
+});
+
 document.getElementById('fileInput').addEventListener('change', function(e){
   const file = e.target.files[0];
   if(!file) return;
@@ -1005,7 +1011,7 @@ function openRecordSheet(proj){
 async function saveRecord(){
   const uang = document.getElementById('f_uang').value;
   const project = document.getElementById('f_project').value;
-  const total = Number(document.getElementById('f_total').value);
+  const total = Number(document.getElementById('f_total').value.replace(/\./g, ''));
   if(!total || total<=0){ showToast('Isi dulu total harga di nota.', 'err'); return; }
   if(!uang || uang==='__new__'){ showToast('Pilih dulu pakai uang siapa.', 'err'); return; }
   if(!project || project==='__new__'){ showToast('Pilih dulu untuk project/keperluan apa.', 'err'); return; }
