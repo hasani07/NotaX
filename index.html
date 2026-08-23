@@ -305,7 +305,7 @@
       <div class="name">Nota<span>X</span></div>
       <p>Catat, kelola, dan kontrol setiap pengeluaran proyek dengan mudah.</p>
     </div>
-    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v16-firebase</span></div>
+    <div class="sidebar-copyright">© 2026 NotaX<br>All rights reserved.<br><span style="opacity:0.5;">build v17-supabase</span></div>
   </div>
 </div>
 
@@ -358,7 +358,7 @@
           <label>Total harga di nota</label>
           <div class="rp-wrap">
             <div class="rp-prefix">Rp</div>
-            <input type="text" inputmode="numeric" id="f_total" placeholder="0">
+            <input type="number" id="f_total" placeholder="0">
           </div>
         </div>
       </div>
@@ -534,19 +534,11 @@
 <div class="toast-wrap" id="toastWrap"></div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCgkGYR5WrLgWcprju1Vbrd6wD3uLYrUvY",
-  authDomain: "notax-964ae.firebaseapp.com",
-  projectId: "notax-964ae",
-  storageBucket: "notax-964ae.firebasestorage.app",
-  messagingSenderId: "771699854922",
-  appId: "1:771699854922:web:6513b244492a66fdfce0b3"
-};
-const fbApp = initializeApp(firebaseConfig);
-const db = getFirestore(fbApp);
+const SUPABASE_URL = 'https://rfdiydqzeyvzphbwpoxf.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_mJtTaRCwcPooa1oLfOssaw_uYPTKcb0';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let DATA = { records: [], options: { uang: ["Uang Pribadi","Uang PT"], project: [] }, projectLinks: {}, cloudName: '', uploadPreset: '' };
 let noReceipt = false;
@@ -657,35 +649,53 @@ function jsonOut_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }`;
 
+function toDbRecord(local){
+  return {
+    id: local.id, date: local.date, description: local.desc, total: local.total,
+    uang: local.uang, project: local.project, note: local.note,
+    has_receipt: local.hasReceipt, foto_url: local.fotoUrl, created_at: local.createdAt
+  };
+}
+function fromDbRecord(row){
+  return {
+    id: row.id, date: row.date, desc: row.description, total: row.total,
+    uang: row.uang, project: row.project, note: row.note,
+    hasReceipt: row.has_receipt, fotoUrl: row.foto_url, createdAt: row.created_at
+  };
+}
+
+async function loadRecordsOnce(){
+  const { data, error } = await supabase.from('records').select('*').order('created_at', { ascending:false });
+  if(error){ console.error('gagal muat records', error); showToast('Gagal memuat data dari database.', 'err'); return; }
+  DATA.records = (data||[]).map(fromDbRecord);
+  renderStats();
+  renderBoard();
+}
+
+async function loadConfigOnce(){
+  const { data, error } = await supabase.from('config').select('*');
+  if(error){ console.error('gagal muat config', error); return; }
+  (data||[]).forEach(row=>{
+    if(row.key==='options' && row.value) DATA.options = row.value;
+    if(row.key==='projectLinks' && row.value) DATA.projectLinks = row.value;
+    if(row.key==='cloudinary' && row.value){ DATA.cloudName = row.value.cloudName||''; DATA.uploadPreset = row.value.uploadPreset||''; }
+  });
+  refreshDropdowns();
+  updateProjectLinkRow();
+  updateUangDeleteRow();
+}
+
 function initApp(){
-  onSnapshot(query(collection(db,'records'), orderBy('createdAt','desc')), (snap)=>{
-    DATA.records = snap.docs.map(d=>({ id: d.id, ...d.data() }));
-    renderStats();
-    renderBoard();
-  }, (err)=>{ console.error('gagal baca records', err); showToast('Gagal terhubung ke database. Cek koneksi internet.', 'err'); });
+  loadRecordsOnce();
+  loadConfigOnce();
 
-  onSnapshot(doc(db,'config','options'), (snap)=>{
-    if(snap.exists()){
-      const d = snap.data();
-      DATA.options.uang = d.uang && d.uang.length ? d.uang : DATA.options.uang;
-      DATA.options.project = d.project || [];
-    }
-    refreshDropdowns();
-    updateUangDeleteRow();
-  });
+  supabase.channel('records-changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'records' }, ()=>{ loadRecordsOnce(); })
+    .subscribe();
 
-  onSnapshot(doc(db,'config','projectLinks'), (snap)=>{
-    DATA.projectLinks = snap.exists() ? snap.data() : {};
-    refreshDropdowns();
-    updateProjectLinkRow();
-  });
-
-  onSnapshot(doc(db,'config','cloudinary'), (snap)=>{
-    if(snap.exists()){
-      DATA.cloudName = snap.data().cloudName || '';
-      DATA.uploadPreset = snap.data().uploadPreset || '';
-    }
-  });
+  supabase.channel('config-changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'config' }, ()=>{ loadConfigOnce(); })
+    .subscribe();
 
   document.getElementById('scriptCodeBox').textContent = APPS_SCRIPT_CODE;
   const today = new Date();
@@ -693,14 +703,14 @@ function initApp(){
   document.getElementById('todayLabel').textContent = today.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
 }
 
-async function saveOptionsToFirestore_(){
-  await setDoc(doc(db,'config','options'), DATA.options);
+async function saveOptionsToSupabase_(){
+  await supabase.from('config').upsert({ key:'options', value: DATA.options });
 }
-async function saveProjectLinksToFirestore_(){
-  await setDoc(doc(db,'config','projectLinks'), DATA.projectLinks);
+async function saveProjectLinksToSupabase_(){
+  await supabase.from('config').upsert({ key:'projectLinks', value: DATA.projectLinks });
 }
-async function saveCloudinaryToFirestore_(){
-  await setDoc(doc(db,'config','cloudinary'), { cloudName: DATA.cloudName || '', uploadPreset: DATA.uploadPreset || '' });
+async function saveCloudinaryToSupabase_(){
+  await supabase.from('config').upsert({ key:'cloudinary', value: { cloudName: DATA.cloudName||'', uploadPreset: DATA.uploadPreset||'' } });
 }
 
 function switchView(v){
@@ -709,12 +719,6 @@ function switchView(v){
   document.getElementById('navHome').classList.toggle('active', v==='home');
   document.getElementById('navHistory').classList.toggle('active', v==='history');
 }
-
-document.getElementById('f_total').addEventListener('input', function(e){
-  let digits = e.target.value.replace(/\D/g, '');
-  digits = digits.replace(/^0+(?=\d)/, '');
-  e.target.value = digits ? Number(digits).toLocaleString('id-ID') : '';
-});
 
 document.getElementById('fileInput').addEventListener('change', function(e){
   const file = e.target.files[0];
@@ -819,7 +823,7 @@ async function confirmNewOption(key){
   document.getElementById('f_'+key).value = val;
   document.getElementById('new'+key.charAt(0).toUpperCase()+key.slice(1)+'Box').style.display='none';
   input.value='';
-  await saveOptionsToFirestore_();
+  await saveOptionsToSupabase_();
   if(key==='project'){
     updateProjectLinkRow();
     openLinkModal();
@@ -841,7 +845,7 @@ async function deleteUangOption(){
   );
   if(!ok) return;
   DATA.options.uang = DATA.options.uang.filter(u => u !== val);
-  await saveOptionsToFirestore_();
+  await saveOptionsToSupabase_();
   refreshDropdowns();
   document.getElementById('f_uang').value = '';
   updateUangDeleteRow();
@@ -896,8 +900,8 @@ async function saveLinkModal(){
   DATA.cloudName = document.getElementById('m_cloudName').value.trim();
   DATA.uploadPreset = document.getElementById('m_uploadPreset').value.trim();
   DATA.projectLinks[modalProject] = { sheetUrl, scriptUrl };
-  await saveProjectLinksToFirestore_();
-  await saveCloudinaryToFirestore_();
+  await saveProjectLinksToSupabase_();
+  await saveCloudinaryToSupabase_();
   updateProjectLinkRow();
   closeLinkModal();
   showToast('Pengaturan untuk "'+modalProject+'" disimpan — langsung berlaku di semua device.', 'ok');
@@ -922,8 +926,8 @@ async function deleteProject(){
   const proj = modalProject;
   DATA.options.project = DATA.options.project.filter(p => p !== proj);
   delete DATA.projectLinks[proj];
-  await saveOptionsToFirestore_();
-  await saveProjectLinksToFirestore_();
+  await saveOptionsToSupabase_();
+  await saveProjectLinksToSupabase_();
   closeLinkModal();
   document.getElementById('f_project').value = '';
   refreshDropdowns();
@@ -1011,7 +1015,7 @@ function openRecordSheet(proj){
 async function saveRecord(){
   const uang = document.getElementById('f_uang').value;
   const project = document.getElementById('f_project').value;
-  const total = Number(document.getElementById('f_total').value.replace(/\./g, ''));
+  const total = Number(document.getElementById('f_total').value);
   if(!total || total<=0){ showToast('Isi dulu total harga di nota.', 'err'); return; }
   if(!uang || uang==='__new__'){ showToast('Pilih dulu pakai uang siapa.', 'err'); return; }
   if(!project || project==='__new__'){ showToast('Pilih dulu untuk project/keperluan apa.', 'err'); return; }
@@ -1032,15 +1036,14 @@ async function saveRecord(){
     fotoUrl = await uploadToCloudinary_(localReceiptImage, DATA.cloudName, DATA.uploadPreset, project);
   }
 
-  const recordData = { date, desc, total, uang, project, note, hasReceipt, fotoUrl, createdAt: Date.now() };
-  try{
-    await setDoc(doc(db,'records',id), recordData);
-    showToast('✓ Tersimpan.', 'ok');
-  }catch(e){
-    console.error(e);
+  const recordData = { id, date, desc, total, uang, project, note, hasReceipt, fotoUrl, createdAt: Date.now() };
+  const { error } = await supabase.from('records').insert(toDbRecord(recordData));
+  if(error){
+    console.error(error);
     showToast('Gagal menyimpan ke database. Cek koneksi internet.', 'err');
     return;
   }
+  showToast('✓ Tersimpan.', 'ok');
 
   resetForm();
 
@@ -1058,10 +1061,9 @@ async function saveRecord(){
 async function deleteRecord(id){
   if(!confirm('Hapus catatan ini? Kalau project ini tersambung spreadsheet, baris yang sesuai juga otomatis ikut dihapus di sana.')) return;
   const rec = DATA.records.find(r => r.id === id);
-  try{
-    await deleteDoc(doc(db,'records',id));
-  }catch(e){
-    console.error(e);
+  const { error } = await supabase.from('records').delete().eq('id', id);
+  if(error){
+    console.error(error);
     showToast('Gagal menghapus. Cek koneksi internet.', 'err');
     return;
   }
