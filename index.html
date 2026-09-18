@@ -132,9 +132,9 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
         <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" style="display:none">
         <div class="drop-actions" style="display:flex;gap:8px;flex-wrap:wrap">
           <button type="button" class="btn btn-ghost btn-sm" onclick="openFilePicker()">Upload File</button>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="pasteFromClipboard()">Paste dari Clipboard</button>
+          <button type="button" id="pasteClipboardBtn" class="btn btn-ghost btn-sm" onclick="pasteFromClipboard()">Paste dari Clipboard</button>
         </div>
-        <div class="small-note">Di HP, tombol Paste membutuhkan izin clipboard browser dan dukungannya berbeda-beda. Kalau tidak didukung, gunakan Upload File.</div>
+        <div class="small-note" id="clipboardHelp">Desktop: bisa pakai Ctrl+V. HP: gunakan Paste jika didukung browser, atau Upload File.</div>
         <div class="small-note" id="existingFileNote"></div>
         <div class="checkbox-row"><input type="checkbox" id="noReceiptChk" onchange="toggleNoReceipt()"><label for="noReceiptChk" style="margin:0">Tidak ada bukti nota</label></div>
       </div>
@@ -540,26 +540,74 @@ function openFilePicker(){
   if(noReceipt)return showToast('Matikan pilihan "Tidak ada bukti nota" dulu.','err');
   document.getElementById('fileInput').click();
 }
+function isMobileDevice(){
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent||'');
+}
+
+function updateClipboardUI(){
+  const btn=document.getElementById('pasteClipboardBtn');
+  const help=document.getElementById('clipboardHelp');
+  if(!btn||!help)return;
+
+  const hasClipboardRead=!!(navigator.clipboard&&navigator.clipboard.read);
+
+  if(hasClipboardRead){
+    btn.style.display='inline-flex';
+    help.textContent=isMobileDevice()
+      ? 'HP: tombol Paste bisa dicoba. Jika browser menolak izin clipboard, gunakan Upload File.'
+      : 'Desktop: gunakan tombol Paste atau Ctrl+V. Ctrl+V biasanya paling kompatibel.';
+  }else{
+    btn.style.display='none';
+    help.textContent=isMobileDevice()
+      ? 'Browser ini tidak mendukung paste gambar lewat tombol. Gunakan Upload File.'
+      : 'Browser ini tidak mendukung paste lewat tombol. Gunakan Ctrl+V atau Upload File.';
+  }
+}
+
 async function pasteFromClipboard(){
   if(noReceipt)return showToast('Matikan pilihan "Tidak ada bukti nota" dulu.','err');
+
+  if(!(navigator.clipboard&&navigator.clipboard.read)){
+    showToast(
+      isMobileDevice()
+        ? 'Browser ini tidak mendukung paste gambar lewat tombol. Gunakan Upload File.'
+        : 'Paste lewat tombol tidak didukung. Gunakan Ctrl+V atau Upload File.',
+      'err'
+    );
+    return;
+  }
+
   try{
-    if(!navigator.clipboard||!navigator.clipboard.read)throw new Error('Clipboard image API tidak didukung browser ini');
     const items=await navigator.clipboard.read();
+
     for(const item of items){
-      const type=item.types.find(t=>t.startsWith('image/'));
-      if(type){
-        const blob=await item.getType(type);
-        const ext=type.includes('png')?'png':'jpg';
-        const f=new File([blob],`clipboard-${Date.now()}.${ext}`,{type});
-        await processReceiptFile(f);
+      const imageType=item.types.find(t=>t.startsWith('image/'));
+      if(imageType){
+        const blob=await item.getType(imageType);
+        const ext=imageType.includes('png')?'png':imageType.includes('webp')?'webp':'jpg';
+        const file=new File([blob],`clipboard-${Date.now()}.${ext}`,{type:imageType});
+        await processReceiptFile(file);
         showToast('Gambar dari clipboard siap diupload.','ok');
         return;
       }
     }
-    throw new Error('Clipboard tidak berisi gambar');
+
+    showToast('Clipboard tidak berisi gambar.','err');
+
   }catch(e){
-    console.error(e);
-    showToast('Paste clipboard tidak tersedia. Gunakan Upload File atau paste lewat keyboard jika didukung.','err');
+    console.error('Clipboard read failed:',e);
+    const permissionError=e?.name==='NotAllowedError'||e?.name==='SecurityError';
+
+    showToast(
+      isMobileDevice()
+        ? (permissionError
+            ? 'Browser menolak izin clipboard. Gunakan Upload File.'
+            : 'Paste lewat tombol tidak tersedia di browser ini. Gunakan Upload File.')
+        : (permissionError
+            ? 'Izin clipboard ditolak. Gunakan Ctrl+V atau Upload File.'
+            : 'Paste lewat tombol gagal. Gunakan Ctrl+V atau Upload File.'),
+      'err'
+    );
   }
 }
 function toggleNoReceipt(){noReceipt=document.getElementById('noReceiptChk').checked;document.getElementById('dropZone').classList.toggle('disabled',noReceipt);if(noReceipt){clearReceiptPreview();existingReceiptUrl='';existingReceiptType='';document.getElementById('existingFileNote').textContent=''}}
@@ -680,11 +728,12 @@ function openLightbox(src){document.getElementById('lightboxImg').src=src;docume
 
 async function initApp(){
   const today=new Date();document.getElementById('f_date').value=today.toISOString().slice(0,10);document.getElementById('todayLabel').textContent=today.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
+  updateClipboardUI();
   await Promise.all([loadRecordsOnce(),loadConfigOnce()]);
   supabase.channel('records-changes').on('postgres_changes',{event:'*',schema:'public',table:'records'},()=>loadRecordsOnce()).subscribe();
   supabase.channel('config-changes').on('postgres_changes',{event:'*',schema:'public',table:'config'},()=>loadConfigOnce()).subscribe();
 }
-Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,pasteFromClipboard,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,openRecordSheet,handleSheetBtn,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,toggleProjectSettings,saveProjectSettings});
+Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,pasteFromClipboard,updateClipboardUI,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,openRecordSheet,handleSheetBtn,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,toggleProjectSettings,saveProjectSettings});
 initApp();
 </script>
 </body>
