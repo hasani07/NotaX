@@ -576,20 +576,9 @@ function resetForm(keepEdit=false){
   }
 }
 
-async function cancelEdit(){
-  const original=editOriginalRecord ? {...editOriginalRecord} : null;
-
-  // Cancel tidak menyimpan perubahan form ke Supabase.
-  // Untuk memastikan row Google Sheet tetap ada, kirim ulang data ORIGINAL sebagai upsert/update.
-  if(original){
-    try{
-      await ensureOriginalRecordOnSheet(original);
-    }catch(e){
-      console.error('Gagal memastikan row spreadsheet saat cancel:',e);
-      // Form tetap dibatalkan; Supabase tidak disentuh.
-    }
-  }
-
+function cancelEdit(){
+  // Batalkan edit hanya membuang perubahan lokal di form.
+  // TIDAK mengirim request ke Supabase maupun Google Spreadsheet.
   resetForm();
   showToast('Edit dibatalkan. Data asli tetap dipertahankan.','ok');
 }
@@ -635,33 +624,6 @@ async function syncNewRecordToSheet(r){
   const cfg=getLinkCfg(r.project);if(!cfg.scriptUrl)return;
   const payload={id:r.id,tanggal:r.date,beli_apa:r.desc,total:r.total,pakai_uang:r.uang,project:r.project,ada_bukti_nota:r.hasReceipt?'Ya':'Tidak',catatan:r.note,foto_url:r.fotoUrl};
   const sep=cfg.scriptUrl.includes('?')?'&':'?';await sendViaIframe(cfg.scriptUrl+sep+'data='+encodeURIComponent(JSON.stringify(payload))+'&_='+Date.now());
-}
-
-async function ensureOriginalRecordOnSheet(r){
-  const cfg=getLinkCfg(r.project);
-  if(!cfg.scriptUrl)return;
-
-  const payload={
-    id:r.id,
-    tanggal:r.date,
-    beli_apa:r.desc,
-    total:r.total,
-    pakai_uang:r.uang,
-    project:r.project,
-    ada_bukti_nota:r.hasReceipt?'Ya':'Tidak',
-    catatan:r.note,
-    foto_url:r.fotoUrl
-  };
-
-  const sep=cfg.scriptUrl.includes('?')?'&':'?';
-  await sendViaIframe(
-    cfg.scriptUrl+
-    sep+
-    'action=update&data='+
-    encodeURIComponent(JSON.stringify(payload))+
-    '&_='+
-    Date.now()
-  );
 }
 
 async function syncEditedRecordToSheet(oldRec,newRec){
