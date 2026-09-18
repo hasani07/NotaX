@@ -368,23 +368,36 @@ async function deleteOptionDoubleConfirm(type){
   const select=document.getElementById(type==='uang'?'uangDeleteSelect':'projectDeleteSelect');
   const value=(select?.value||'').trim();
 
-  if(!value)return showToast('Pilih '+label+' yang ingin dihapus.','err');
+  if(!value){
+    showToast('Pilih '+label+' yang ingin dihapus.','err');
+    return;
+  }
 
-  const first=confirm('Konfirmasi 1/2
+  const firstMessage =
+    'Konfirmasi 1/2
 
-Hapus "'+value+'" dari daftar '+label+'?
+' +
+    'Hapus "' + value + '" dari daftar ' + label + '?
 
-Data transaksi lama TIDAK akan dihapus.');
-  if(!first)return;
+' +
+    'Data transaksi lama TIDAK akan dihapus.';
 
-  const second=confirm('Konfirmasi 2/2
+  if(!window.confirm(firstMessage)) return;
 
-Yakin sekali lagi ingin menghapus "'+value+'"?
+  const secondMessage =
+    'Konfirmasi 2/2
 
-Tindakan ini hanya menghapusnya dari pilihan dropdown.');
-  if(!second)return;
+' +
+    'Yakin sekali lagi ingin menghapus "' + value + '"?
 
-  const backup=[...(DATA.options[type]||[])];
+' +
+    'Tindakan ini hanya menghapusnya dari pilihan dropdown.';
+
+  if(!window.confirm(secondMessage)) return;
+
+  const backupOptions=[...(DATA.options[type]||[])];
+  const backupProjectLinks={...DATA.projectLinks};
+
   DATA.options[type]=(DATA.options[type]||[]).filter(v=>v!==value);
 
   try{
@@ -395,19 +408,20 @@ Tindakan ini hanya menghapusnya dari pilihan dropdown.');
 
     await saveOptions();
     refreshDropdowns();
-    refreshDeleteSelects();
 
-    if(document.getElementById('f_'+type).value===value){
-      document.getElementById('f_'+type).value='';
+    const current=document.getElementById('f_'+type);
+    if(current && current.value===value){
+      current.value='';
     }
 
     toggleOptionPanel(type,'delete',false);
     showToast(label+' berhasil dihapus dari daftar.','ok');
+
   }catch(e){
     console.error(e);
-    DATA.options[type]=backup;
+    DATA.options[type]=backupOptions;
+    DATA.projectLinks=backupProjectLinks;
     refreshDropdowns();
-    refreshDeleteSelects();
     showToast('Gagal menghapus '+label+'.','err');
   }
 }
@@ -632,10 +646,25 @@ function handleSheetBtn(){const p=document.getElementById('filterProject').value
 function openLightbox(src){document.getElementById('lightboxImg').src=src;document.getElementById('lightbox').classList.add('open')}
 
 async function initApp(){
-  const today=new Date();document.getElementById('f_date').value=today.toISOString().slice(0,10);document.getElementById('todayLabel').textContent=today.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
-  await Promise.all([loadRecordsOnce(),loadConfigOnce()]);
-  supabase.channel('records-changes').on('postgres_changes',{event:'*',schema:'public',table:'records'},()=>loadRecordsOnce()).subscribe();
-  supabase.channel('config-changes').on('postgres_changes',{event:'*',schema:'public',table:'config'},()=>loadConfigOnce()).subscribe();
+  const today=new Date();
+  document.getElementById('f_date').value=today.toISOString().slice(0,10);
+  document.getElementById('todayLabel').textContent=today.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
+
+  const results=await Promise.allSettled([loadRecordsOnce(),loadConfigOnce()]);
+  results.forEach((r,i)=>{
+    if(r.status==='rejected') console.error(i===0?'records load failed':'config load failed',r.reason);
+  });
+
+  refreshDropdowns();
+  renderBoard();
+
+  supabase.channel('records-changes')
+    .on('postgres_changes',{event:'*',schema:'public',table:'records'},()=>loadRecordsOnce())
+    .subscribe();
+
+  supabase.channel('config-changes')
+    .on('postgres_changes',{event:'*',schema:'public',table:'config'},()=>loadConfigOnce())
+    .subscribe();
 }
 Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,pasteFromClipboard,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,openRecordSheet,handleSheetBtn,openLightbox,toggleOptionPanel,saveNewOption,deleteOptionDoubleConfirm,toggleProjectSettings,saveProjectSettings});
 initApp();
