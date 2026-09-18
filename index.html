@@ -135,6 +135,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
           <button type="button" id="pasteClipboardBtn" class="btn btn-ghost btn-sm" onclick="pasteFromClipboard()">Paste dari Clipboard</button>
         </div>
         <div class="small-note" id="clipboardHelp">Desktop: bisa pakai Ctrl+V. HP: gunakan Paste jika didukung browser, atau Upload File.</div>
+        <div id="receiptActionBar" style="display:none;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="replaceReceipt()">Ganti Bukti</button>
+          <button type="button" class="btn btn-danger btn-sm" onclick="removeReceipt()">Hapus Bukti</button>
+        </div>
         <div class="small-note" id="existingFileNote"></div>
         <div class="checkbox-row"><input type="checkbox" id="noReceiptChk" onchange="toggleNoReceipt()"><label for="noReceiptChk" style="margin:0">Tidak ada bukti nota</label></div>
       </div>
@@ -506,8 +510,14 @@ function switchView(v){
 document.getElementById('f_total').addEventListener('input',e=>{let raw=e.target.value.replace(/\D/g,'');e.target.value=raw?Number(raw).toLocaleString('id-ID'):''});
 
 function clearReceiptPreview(){
-  receiptFile=null;document.getElementById('preview').style.display='none';document.getElementById('preview').src='';
-  document.getElementById('pdfPreview').style.display='none';document.getElementById('pdfName').textContent='';document.getElementById('dropLabel').style.display='block';
+  receiptFile=null;
+  document.getElementById('preview').style.display='none';
+  document.getElementById('preview').src='';
+  document.getElementById('pdfPreview').style.display='none';
+  document.getElementById('pdfName').textContent='';
+  document.getElementById('dropLabel').style.display='block';
+  const bar=document.getElementById('receiptActionBar');
+  if(bar)bar.style.display='none';
 }
 async function processReceiptFile(file){
   if(!file)return;
@@ -516,7 +526,14 @@ async function processReceiptFile(file){
   if(file.size>10*1024*1024){showToast('Ukuran file maksimal 10MB.','err');return}
   noReceipt=false;document.getElementById('noReceiptChk').checked=false;document.getElementById('dropZone').classList.remove('disabled');
   if(file.type==='application/pdf'){
-    receiptFile=file;document.getElementById('preview').style.display='none';document.getElementById('pdfName').textContent=file.name||'nota.pdf';document.getElementById('pdfPreview').style.display='block';document.getElementById('dropLabel').style.display='none';return;
+    receiptFile=file;
+    document.getElementById('preview').style.display='none';
+    document.getElementById('pdfName').textContent=file.name||'nota.pdf';
+    document.getElementById('pdfPreview').style.display='block';
+    document.getElementById('dropLabel').style.display='none';
+    document.getElementById('receiptActionBar').style.display='flex';
+    document.getElementById('existingFileNote').textContent='File baru siap disimpan.';
+    return;
   }
   const dataUrl=await new Promise((resolve,reject)=>{const fr=new FileReader();fr.onload=e=>resolve(e.target.result);fr.onerror=reject;fr.readAsDataURL(file)});
   const img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=dataUrl});
@@ -524,7 +541,12 @@ async function processReceiptFile(file){
   canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
   const blob=await new Promise(r=>canvas.toBlob(r,'image/jpeg',.82));
   receiptFile=new File([blob],(file.name||'nota').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'});
-  document.getElementById('preview').src=URL.createObjectURL(receiptFile);document.getElementById('preview').style.display='block';document.getElementById('pdfPreview').style.display='none';document.getElementById('dropLabel').style.display='none';
+  document.getElementById('preview').src=URL.createObjectURL(receiptFile);
+  document.getElementById('preview').style.display='block';
+  document.getElementById('pdfPreview').style.display='none';
+  document.getElementById('dropLabel').style.display='none';
+  document.getElementById('receiptActionBar').style.display='flex';
+  document.getElementById('existingFileNote').textContent='File baru siap disimpan. Upload/paste lagi untuk mengganti.';
 }
 document.getElementById('fileInput').addEventListener('change',e=>processReceiptFile(e.target.files[0]));
 const dz=document.getElementById('dropZone');
@@ -536,6 +558,32 @@ document.addEventListener('paste',e=>{
   if(item){e.preventDefault();const f=item.getAsFile();processReceiptFile(new File([f],`clipboard-${Date.now()}.png`,{type:f.type||'image/png'}));showToast('Gambar dari clipboard siap diupload.','ok')}
 });
 function handleDropZoneClick(){if(!noReceipt)document.getElementById('fileInput').click()}
+
+function replaceReceipt(){
+  noReceipt=false;
+  document.getElementById('noReceiptChk').checked=false;
+  document.getElementById('dropZone').classList.remove('disabled');
+  document.getElementById('fileInput').click();
+}
+
+function removeReceipt(){
+  receiptFile=null;
+  existingReceiptUrl='';
+  existingReceiptType='';
+  noReceipt=true;
+  document.getElementById('noReceiptChk').checked=true;
+  document.getElementById('dropZone').classList.add('disabled');
+  document.getElementById('fileInput').value='';
+  document.getElementById('preview').style.display='none';
+  document.getElementById('preview').src='';
+  document.getElementById('pdfPreview').style.display='none';
+  document.getElementById('pdfName').textContent='';
+  document.getElementById('dropLabel').style.display='block';
+  document.getElementById('receiptActionBar').style.display='none';
+  document.getElementById('existingFileNote').textContent='Bukti nota akan dihapus saat perubahan disimpan.';
+  showToast('Bukti nota ditandai untuk dihapus.','ok');
+}
+
 function openFilePicker(){
   if(noReceipt)return showToast('Matikan pilihan "Tidak ada bukti nota" dulu.','err');
   document.getElementById('fileInput').click();
@@ -610,7 +658,25 @@ async function pasteFromClipboard(){
     );
   }
 }
-function toggleNoReceipt(){noReceipt=document.getElementById('noReceiptChk').checked;document.getElementById('dropZone').classList.toggle('disabled',noReceipt);if(noReceipt){clearReceiptPreview();existingReceiptUrl='';existingReceiptType='';document.getElementById('existingFileNote').textContent=''}}
+function toggleNoReceipt(){
+  noReceipt=document.getElementById('noReceiptChk').checked;
+  document.getElementById('dropZone').classList.toggle('disabled',noReceipt);
+  if(noReceipt){
+    receiptFile=null;
+    existingReceiptUrl='';
+    existingReceiptType='';
+    document.getElementById('fileInput').value='';
+    document.getElementById('preview').style.display='none';
+    document.getElementById('preview').src='';
+    document.getElementById('pdfPreview').style.display='none';
+    document.getElementById('pdfName').textContent='';
+    document.getElementById('dropLabel').style.display='block';
+    document.getElementById('receiptActionBar').style.display='none';
+    document.getElementById('existingFileNote').textContent='Tidak ada bukti nota.';
+  }else{
+    document.getElementById('existingFileNote').textContent='Upload, paste, atau pilih file bukti nota.';
+  }
+}
 
 function resetForm(keepEdit=false){
   document.getElementById('f_desc').value='';document.getElementById('f_date').value=new Date().toISOString().slice(0,10);document.getElementById('f_total').value='';document.getElementById('f_note').value='';document.getElementById('f_uang').value='';document.getElementById('f_project').value='';
@@ -637,8 +703,36 @@ function editRecord(id){
   existingReceiptUrl=r.fotoUrl||'';
   existingReceiptType=r.receiptType||guessType(r.fotoUrl);
   document.getElementById('f_desc').value=r.desc||'';document.getElementById('f_date').value=r.date||'';document.getElementById('f_total').value=Number(r.total||0).toLocaleString('id-ID');document.getElementById('f_uang').value=r.uang||'';document.getElementById('f_project').value=r.project||'';document.getElementById('f_note').value=r.note||'';
-  noReceipt=!r.hasReceipt;document.getElementById('noReceiptChk').checked=noReceipt;document.getElementById('dropZone').classList.toggle('disabled',noReceipt);clearReceiptPreview();
-  if(r.hasReceipt&&r.fotoUrl)document.getElementById('existingFileNote').innerHTML=`File saat ini: <a href="${escapeHtml(r.fotoUrl)}" target="_blank" rel="noopener">buka bukti nota</a>. Upload file baru hanya jika ingin mengganti.`;
+  noReceipt=!r.hasReceipt;
+  document.getElementById('noReceiptChk').checked=noReceipt;
+  document.getElementById('dropZone').classList.toggle('disabled',noReceipt);
+
+  receiptFile=null;
+  document.getElementById('fileInput').value='';
+  document.getElementById('preview').style.display='none';
+  document.getElementById('preview').src='';
+  document.getElementById('pdfPreview').style.display='none';
+  document.getElementById('pdfName').textContent='';
+  document.getElementById('dropLabel').style.display='block';
+  document.getElementById('receiptActionBar').style.display='none';
+
+  if(r.hasReceipt&&r.fotoUrl){
+    const isPdf=(r.receiptType==='application/pdf'||guessType(r.fotoUrl)==='application/pdf');
+    if(isPdf){
+      document.getElementById('pdfName').textContent='Bukti nota saat ini';
+      document.getElementById('pdfPreview').style.display='block';
+      document.getElementById('dropLabel').style.display='none';
+    }else{
+      document.getElementById('preview').src=r.fotoUrl;
+      document.getElementById('preview').style.display='block';
+      document.getElementById('dropLabel').style.display='none';
+    }
+    document.getElementById('receiptActionBar').style.display='flex';
+    document.getElementById('existingFileNote').innerHTML=`Bukti nota saat ini · <a href="${escapeHtml(r.fotoUrl)}" target="_blank" rel="noopener">buka ukuran penuh</a>`;
+  }else{
+    document.getElementById('existingFileNote').textContent='Tidak ada bukti nota.';
+  }
+
   document.getElementById('editBannerText').textContent='Sedang mengedit: '+(r.desc||r.id);document.getElementById('editBanner').classList.add('show');document.getElementById('formTitle').textContent='Edit Catatan';document.getElementById('saveBtn').textContent='Simpan Perubahan';
   switchView('home');window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -733,7 +827,7 @@ async function initApp(){
   supabase.channel('records-changes').on('postgres_changes',{event:'*',schema:'public',table:'records'},()=>loadRecordsOnce()).subscribe();
   supabase.channel('config-changes').on('postgres_changes',{event:'*',schema:'public',table:'config'},()=>loadConfigOnce()).subscribe();
 }
-Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,pasteFromClipboard,updateClipboardUI,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,openRecordSheet,handleSheetBtn,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,toggleProjectSettings,saveProjectSettings});
+Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,replaceReceipt,removeReceipt,pasteFromClipboard,updateClipboardUI,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,openRecordSheet,handleSheetBtn,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,toggleProjectSettings,saveProjectSettings});
 initApp();
 </script>
 </body>
