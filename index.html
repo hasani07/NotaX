@@ -145,8 +145,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
           <select id="f_uang"></select>
 
           <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px">
-            <button class="btn btn-ghost btn-sm" onclick="toggleOptionPanel('uang','add')">+ Tambah sumber uang</button>
-            <button class="btn btn-danger btn-sm" onclick="toggleOptionPanel('uang','delete')">Hapus sumber uang</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="openManager('uang','add')">+ Tambah sumber uang</button>
+            <button type="button" class="btn btn-danger btn-sm" onclick="openManager('uang','delete')">Hapus sumber uang</button>
           </div>
 
           <div id="uangAddPanel" style="display:none;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fbfbfa">
@@ -155,17 +155,19 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
               <input type="text" id="uangNewName" placeholder="mis. BRI ZTS">
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" class="btn btn-primary btn-sm" onclick="saveNewOption('uang')">Tambah</button>
-              <button type="button" class="btn btn-ghost btn-sm" onclick="toggleOptionPanel('uang','add',false)">Batal</button>
+              <button type="button" class="btn btn-primary btn-sm" onclick="saveManagedOption('uang')">Tambah</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="closeManagers()">Batal</button>
             </div>
           </div>
 
           <div id="uangDeletePanel" style="display:none;margin-top:10px;padding:12px;border:1px solid #e6c3ba;border-radius:10px;background:#fff8f6">
-            <div class="small-note" style="margin-top:0;margin-bottom:10px;color:var(--red)">Pilih sumber uang yang ingin dihapus dari pilihan dropdown. Data transaksi lama tidak akan dihapus.</div>
+            <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--red);margin-bottom:7px;font-weight:700">Hapus sumber uang</label>
             <select id="uangDeleteSelect"></select>
+            <div id="uangDeleteStep2" style="display:none;margin-top:10px;padding:10px;border-radius:8px;background:#fff0ec;color:var(--red);font-size:12px;font-weight:600"></div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-              <button type="button" class="btn btn-danger btn-sm" onclick="deleteOptionDoubleConfirm('uang')">Hapus</button>
-              <button type="button" class="btn btn-ghost btn-sm" onclick="toggleOptionPanel('uang','delete',false)">Batal</button>
+              <button type="button" id="uangDeleteNextBtn" class="btn btn-danger btn-sm" onclick="beginDeleteOption('uang')">Lanjut Hapus</button>
+              <button type="button" id="uangDeleteFinalBtn" class="btn btn-danger btn-sm" style="display:none" onclick="finalDeleteOption('uang')">Ya, Hapus Sekarang</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="closeManagers()">Batal</button>
             </div>
           </div>
         </div>
@@ -175,9 +177,9 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
           <select id="f_project"></select>
 
           <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px">
-            <button class="btn btn-ghost btn-sm" onclick="toggleOptionPanel('project','add')">+ Tambah project</button>
-            <button class="btn btn-danger btn-sm" onclick="toggleOptionPanel('project','delete')">Hapus project</button>
-            <button class="btn btn-ghost btn-sm" onclick="toggleProjectSettings()">Atur link project</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="openManager('project','add')">+ Tambah project</button>
+            <button type="button" class="btn btn-danger btn-sm" onclick="openManager('project','delete')">Hapus project</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="toggleProjectSettings()">Atur link project</button>
           </div>
 
           <div id="projectAddPanel" style="display:none;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fbfbfa">
@@ -186,17 +188,19 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
               <input type="text" id="projectNewName" placeholder="mis. T4T, Aset, dll">
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" class="btn btn-primary btn-sm" onclick="saveNewOption('project')">Tambah</button>
-              <button type="button" class="btn btn-ghost btn-sm" onclick="toggleOptionPanel('project','add',false)">Batal</button>
+              <button type="button" class="btn btn-primary btn-sm" onclick="saveManagedOption('project')">Tambah</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="closeManagers()">Batal</button>
             </div>
           </div>
 
           <div id="projectDeletePanel" style="display:none;margin-top:10px;padding:12px;border:1px solid #e6c3ba;border-radius:10px;background:#fff8f6">
-            <div class="small-note" style="margin-top:0;margin-bottom:10px;color:var(--red)">Pilih project yang ingin dihapus dari pilihan dropdown. Data transaksi lama tidak akan dihapus.</div>
+            <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--red);margin-bottom:7px;font-weight:700">Hapus project</label>
             <select id="projectDeleteSelect"></select>
+            <div id="projectDeleteStep2" style="display:none;margin-top:10px;padding:10px;border-radius:8px;background:#fff0ec;color:var(--red);font-size:12px;font-weight:600"></div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-              <button type="button" class="btn btn-danger btn-sm" onclick="deleteOptionDoubleConfirm('project')">Hapus</button>
-              <button type="button" class="btn btn-ghost btn-sm" onclick="toggleOptionPanel('project','delete',false)">Batal</button>
+              <button type="button" id="projectDeleteNextBtn" class="btn btn-danger btn-sm" onclick="beginDeleteOption('project')">Lanjut Hapus</button>
+              <button type="button" id="projectDeleteFinalBtn" class="btn btn-danger btn-sm" style="display:none" onclick="finalDeleteOption('project')">Ya, Hapus Sekarang</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="closeManagers()">Batal</button>
             </div>
           </div>
 
@@ -287,145 +291,131 @@ async function loadConfigOnce(){
 async function saveOptions(){const {error}=await supabase.from('config').upsert({key:'options',value:DATA.options});if(error)throw error}
 async function saveProjectLinks(){const {error}=await supabase.from('config').upsert({key:'projectLinks',value:DATA.projectLinks});if(error)throw error}
 async function saveCloudinary(){const {error}=await supabase.from('config').upsert({key:'cloudinary',value:{cloudName:DATA.cloudName||'',uploadPreset:DATA.uploadPreset||''}});if(error)throw error}
-function closeAllOptionPanels(){
+let pendingDelete={uang:null,project:null};
+
+function closeManagers(){
   ['uangAddPanel','uangDeletePanel','projectAddPanel','projectDeletePanel'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display='none';
   });
+
+  ['uang','project'].forEach(type=>{
+    pendingDelete[type]=null;
+    const step=document.getElementById(type+'DeleteStep2');
+    const next=document.getElementById(type+'DeleteNextBtn');
+    const finalBtn=document.getElementById(type+'DeleteFinalBtn');
+    if(step){step.style.display='none';step.textContent=''}
+    if(next)next.style.display='inline-flex';
+    if(finalBtn)finalBtn.style.display='none';
+  });
 }
 
-function refreshDeleteSelects(){
-  const uangSel=document.getElementById('uangDeleteSelect');
-  const projectSel=document.getElementById('projectDeleteSelect');
-
-  if(uangSel){
-    uangSel.innerHTML='<option value="">— pilih sumber uang —</option>'+
-      [...new Set(DATA.options.uang||[])].map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
-  }
-
-  if(projectSel){
-    projectSel.innerHTML='<option value="">— pilih project —</option>'+
-      [...new Set(DATA.options.project||[])].map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
-  }
+function fillManagerSelect(type){
+  const sel=document.getElementById(type+'DeleteSelect');
+  if(!sel)return;
+  const list=DATA.options[type]||[];
+  const label=type==='uang'?'— pilih sumber uang —':'— pilih project —';
+  sel.innerHTML=`<option value="">${label}</option>`+
+    [...new Set(list)].map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
 }
 
-function toggleOptionPanel(type,mode,forceOpen){
-  const targetId=(type==='uang'?'uang':'project')+(mode==='add'?'AddPanel':'DeletePanel');
-  const panel=document.getElementById(targetId);
+function openManager(type,mode){
+  closeManagers();
+  const settings=document.getElementById('projectSettingsPanel');
+  if(settings)settings.style.display='none';
+
+  const id=type+(mode==='add'?'AddPanel':'DeletePanel');
+  const panel=document.getElementById(id);
   if(!panel)return;
 
-  const shouldOpen=(forceOpen===true)||((forceOpen!==false)&&panel.style.display==='none');
+  if(mode==='delete')fillManagerSelect(type);
 
-  closeAllOptionPanels();
-  const ps=document.getElementById('projectSettingsPanel');
-  if(ps)ps.style.display='none';
-
-  if(shouldOpen){
-    if(mode==='delete')refreshDeleteSelects();
-    panel.style.display='block';
-
-    if(mode==='add'){
-      const input=document.getElementById(type==='uang'?'uangNewName':'projectNewName');
-      if(input){
-        input.value='';
-        setTimeout(()=>input.focus(),50);
-      }
-    }
+  if(mode==='add'){
+    const input=document.getElementById(type==='uang'?'uangNewName':'projectNewName');
+    if(input){input.value='';setTimeout(()=>input.focus(),50)}
   }
+
+  panel.style.display='block';
 }
 
-async function saveNewOption(type){
+async function saveManagedOption(type){
   const input=document.getElementById(type==='uang'?'uangNewName':'projectNewName');
-  const label=type==='uang'?'sumber uang':'project';
   const value=(input?.value||'').trim();
+  const label=type==='uang'?'Sumber uang':'Project';
 
-  if(!value)return showToast('Isi nama '+label+' dulu.','err');
+  if(!value)return showToast('Nama '+label.toLowerCase()+' belum diisi.','err');
 
   DATA.options[type]=DATA.options[type]||[];
 
   if(DATA.options[type].some(v=>String(v).toLowerCase()===value.toLowerCase())){
-    return showToast(label+' sudah ada.','err');
+    return showToast(label+' tersebut sudah ada.','err');
   }
 
+  const old=[...DATA.options[type]];
   DATA.options[type].push(value);
 
   try{
     await saveOptions();
     refreshDropdowns();
-    refreshDeleteSelects();
     document.getElementById('f_'+type).value=value;
-    toggleOptionPanel(type,'add',false);
+    closeManagers();
     showToast(label+' berhasil ditambahkan.','ok');
   }catch(e){
     console.error(e);
-    DATA.options[type]=DATA.options[type].filter(v=>v!==value);
-    showToast('Gagal menyimpan '+label+'.','err');
+    DATA.options[type]=old;
+    refreshDropdowns();
+    showToast('Gagal menyimpan '+label.toLowerCase()+'.','err');
   }
 }
 
-async function deleteOptionDoubleConfirm(type){
+function beginDeleteOption(type){
+  const sel=document.getElementById(type+'DeleteSelect');
+  const value=(sel?.value||'').trim();
   const label=type==='uang'?'sumber uang':'project';
-  const select=document.getElementById(type==='uang'?'uangDeleteSelect':'projectDeleteSelect');
-  const value=(select?.value||'').trim();
 
-  if(!value){
-    showToast('Pilih '+label+' yang ingin dihapus.','err');
-    return;
-  }
+  if(!value)return showToast('Pilih '+label+' yang ingin dihapus.','err');
 
-  const firstMessage =
-    'Konfirmasi 1/2
+  pendingDelete[type]=value;
 
-' +
-    'Hapus "' + value + '" dari daftar ' + label + '?
+  const step=document.getElementById(type+'DeleteStep2');
+  step.textContent='Konfirmasi kedua: hapus "'+value+'" dari daftar? Data transaksi lama tidak akan ikut terhapus.';
+  step.style.display='block';
 
-' +
-    'Data transaksi lama TIDAK akan dihapus.';
+  document.getElementById(type+'DeleteNextBtn').style.display='none';
+  document.getElementById(type+'DeleteFinalBtn').style.display='inline-flex';
+}
 
-  if(!window.confirm(firstMessage)) return;
+async function finalDeleteOption(type){
+  const value=pendingDelete[type];
+  if(!value)return;
 
-  const secondMessage =
-    'Konfirmasi 2/2
-
-' +
-    'Yakin sekali lagi ingin menghapus "' + value + '"?
-
-' +
-    'Tindakan ini hanya menghapusnya dari pilihan dropdown.';
-
-  if(!window.confirm(secondMessage)) return;
-
-  const backupOptions=[...(DATA.options[type]||[])];
-  const backupProjectLinks={...DATA.projectLinks};
+  const label=type==='uang'?'Sumber uang':'Project';
+  const oldOptions=[...(DATA.options[type]||[])];
+  const oldLinks={...DATA.projectLinks};
 
   DATA.options[type]=(DATA.options[type]||[]).filter(v=>v!==value);
 
   try{
+    await saveOptions();
+
     if(type==='project' && DATA.projectLinks[value]){
       delete DATA.projectLinks[value];
       await saveProjectLinks();
     }
 
-    await saveOptions();
     refreshDropdowns();
-
-    const current=document.getElementById('f_'+type);
-    if(current && current.value===value){
-      current.value='';
-    }
-
-    toggleOptionPanel(type,'delete',false);
-    showToast(label+' berhasil dihapus dari daftar.','ok');
-
+    closeManagers();
+    showToast(label+' berhasil dihapus dari daftar. Data lama tetap aman.','ok');
   }catch(e){
     console.error(e);
-    DATA.options[type]=backupOptions;
-    DATA.projectLinks=backupProjectLinks;
+    DATA.options[type]=oldOptions;
+    DATA.projectLinks=oldLinks;
     refreshDropdowns();
-    showToast('Gagal menghapus '+label+'.','err');
+    showToast('Gagal menghapus '+label.toLowerCase()+'.','err');
   }
 }
 function toggleProjectSettings(forceOpen){
+  closeManagers();
   const project=document.getElementById('f_project').value;
   if(!project){
     showToast('Pilih project dulu.','err');
@@ -465,11 +455,7 @@ async function saveProjectSettings(){
   }
 }
 function refreshDropdowns(){
-  fillSelect('f_uang',DATA.options.uang);
-  fillSelect('f_project',DATA.options.project);
-  fillFilter('filterUang',DATA.options.uang,'Semua sumber uang');
-  fillFilter('filterProject',DATA.options.project,'Semua project');
-  refreshDeleteSelects();
+  fillSelect('f_uang',DATA.options.uang);fillSelect('f_project',DATA.options.project);fillFilter('filterUang',DATA.options.uang,'Semua sumber uang');fillFilter('filterProject',DATA.options.project,'Semua project');
 }
 function fillSelect(id,list){
   const el=document.getElementById(id),cur=el.value;el.innerHTML='<option value="">— pilih —</option>'+[...new Set(list||[])].map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');if([...el.options].some(o=>o.value===cur))el.value=cur;
@@ -477,7 +463,6 @@ function fillSelect(id,list){
 document.getElementById('f_project').addEventListener('change',()=>{
   const panel=document.getElementById('projectSettingsPanel');
   if(panel)panel.style.display='none';
-  closeAllOptionPanels();
 });
 function fillFilter(id,list,label){
   const el=document.getElementById(id),cur=el.value;el.innerHTML=`<option value="">${label}</option>`+[...new Set(list||[])].map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');if([...el.options].some(o=>o.value===cur))el.value=cur;
@@ -646,27 +631,12 @@ function handleSheetBtn(){const p=document.getElementById('filterProject').value
 function openLightbox(src){document.getElementById('lightboxImg').src=src;document.getElementById('lightbox').classList.add('open')}
 
 async function initApp(){
-  const today=new Date();
-  document.getElementById('f_date').value=today.toISOString().slice(0,10);
-  document.getElementById('todayLabel').textContent=today.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
-
-  const results=await Promise.allSettled([loadRecordsOnce(),loadConfigOnce()]);
-  results.forEach((r,i)=>{
-    if(r.status==='rejected') console.error(i===0?'records load failed':'config load failed',r.reason);
-  });
-
-  refreshDropdowns();
-  renderBoard();
-
-  supabase.channel('records-changes')
-    .on('postgres_changes',{event:'*',schema:'public',table:'records'},()=>loadRecordsOnce())
-    .subscribe();
-
-  supabase.channel('config-changes')
-    .on('postgres_changes',{event:'*',schema:'public',table:'config'},()=>loadConfigOnce())
-    .subscribe();
+  const today=new Date();document.getElementById('f_date').value=today.toISOString().slice(0,10);document.getElementById('todayLabel').textContent=today.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
+  await Promise.all([loadRecordsOnce(),loadConfigOnce()]);
+  supabase.channel('records-changes').on('postgres_changes',{event:'*',schema:'public',table:'records'},()=>loadRecordsOnce()).subscribe();
+  supabase.channel('config-changes').on('postgres_changes',{event:'*',schema:'public',table:'config'},()=>loadConfigOnce()).subscribe();
 }
-Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,pasteFromClipboard,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,openRecordSheet,handleSheetBtn,openLightbox,toggleOptionPanel,saveNewOption,deleteOptionDoubleConfirm,toggleProjectSettings,saveProjectSettings});
+Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,pasteFromClipboard,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,openRecordSheet,handleSheetBtn,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,toggleProjectSettings,saveProjectSettings});
 initApp();
 </script>
 </body>
