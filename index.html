@@ -150,7 +150,22 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
           <select id="f_project"></select>
           <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px">
             <button class="btn btn-ghost btn-sm" onclick="addOption('project')">+ Tambah project</button>
-            <button class="btn btn-ghost btn-sm" onclick="configureProject()">Atur link project</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleProjectSettings()">Atur link project</button>
+          </div>
+
+          <div id="projectSettingsPanel" style="display:none;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fbfbfa">
+            <div class="field" style="margin-bottom:10px">
+              <label>Link Google Spreadsheet</label>
+              <input type="url" id="projectSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/...">
+            </div>
+            <div class="field" style="margin-bottom:10px">
+              <label>Apps Script Web App URL</label>
+              <input type="url" id="projectScriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="btn btn-primary btn-sm" onclick="saveProjectSettings()">Simpan Link</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="toggleProjectSettings(false)">Batal</button>
+            </div>
           </div>
         </div>
       </div>
@@ -233,22 +248,44 @@ async function addOption(type){
   try{await saveOptions();refreshDropdowns();document.getElementById('f_'+type).value=value;showToast(''+label+' ditambahkan.','ok')}
   catch(e){console.error(e);showToast('Gagal menyimpan '+label+'.','err')}
 }
-async function configureProject(){
-  const project=document.getElementById('f_project').value;if(!project)return showToast('Pilih project dulu.','err');
+function toggleProjectSettings(forceOpen){
+  const project=document.getElementById('f_project').value;
+  if(!project){
+    showToast('Pilih project dulu.','err');
+    return;
+  }
+
+  const panel=document.getElementById('projectSettingsPanel');
+  const shouldOpen=(forceOpen===true)||((forceOpen!==false)&&panel.style.display==='none');
+
+  if(!shouldOpen){
+    panel.style.display='none';
+    return;
+  }
+
   const cur=getLinkCfg(project);
-  const sheetUrl=prompt('Link Google Spreadsheet untuk '+project+':',cur.sheetUrl||'');if(sheetUrl===null)return;
-  const scriptUrl=prompt('Apps Script Web App URL untuk '+project+':',cur.scriptUrl||'');if(scriptUrl===null)return;
-  DATA.projectLinks[project]={sheetUrl:sheetUrl.trim(),scriptUrl:scriptUrl.trim()};
-  if(!DATA.cloudName){
-    const cloud=prompt('Cloudinary Cloud Name (boleh Cancel kalau sudah diset dari versi lama):','');
-    if(cloud!==null)DATA.cloudName=cloud.trim();
+  document.getElementById('projectSheetUrl').value=cur.sheetUrl||'';
+  document.getElementById('projectScriptUrl').value=cur.scriptUrl||'';
+  panel.style.display='block';
+}
+
+async function saveProjectSettings(){
+  const project=document.getElementById('f_project').value;
+  if(!project)return showToast('Pilih project dulu.','err');
+
+  const sheetUrl=document.getElementById('projectSheetUrl').value.trim();
+  const scriptUrl=document.getElementById('projectScriptUrl').value.trim();
+
+  DATA.projectLinks[project]={sheetUrl,scriptUrl};
+
+  try{
+    await saveProjectLinks();
+    showToast('Link project disimpan.','ok');
+    document.getElementById('projectSettingsPanel').style.display='none';
+  }catch(e){
+    console.error(e);
+    showToast('Gagal menyimpan pengaturan project.','err');
   }
-  if(!DATA.uploadPreset){
-    const preset=prompt('Cloudinary unsigned upload preset:','');
-    if(preset!==null)DATA.uploadPreset=preset.trim();
-  }
-  try{await saveProjectLinks();await saveCloudinary();showToast('Pengaturan project disimpan.','ok')}
-  catch(e){console.error(e);showToast('Gagal menyimpan pengaturan project.','err')}
 }
 function refreshDropdowns(){
   fillSelect('f_uang',DATA.options.uang);fillSelect('f_project',DATA.options.project);fillFilter('filterUang',DATA.options.uang,'Semua sumber uang');fillFilter('filterProject',DATA.options.project,'Semua project');
@@ -256,6 +293,10 @@ function refreshDropdowns(){
 function fillSelect(id,list){
   const el=document.getElementById(id),cur=el.value;el.innerHTML='<option value="">— pilih —</option>'+[...new Set(list||[])].map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');if([...el.options].some(o=>o.value===cur))el.value=cur;
 }
+document.getElementById('f_project').addEventListener('change',()=>{
+  const panel=document.getElementById('projectSettingsPanel');
+  if(panel)panel.style.display='none';
+});
 function fillFilter(id,list,label){
   const el=document.getElementById(id),cur=el.value;el.innerHTML=`<option value="">${label}</option>`+[...new Set(list||[])].map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');if([...el.options].some(o=>o.value===cur))el.value=cur;
 }
@@ -428,7 +469,7 @@ async function initApp(){
   supabase.channel('records-changes').on('postgres_changes',{event:'*',schema:'public',table:'records'},()=>loadRecordsOnce()).subscribe();
   supabase.channel('config-changes').on('postgres_changes',{event:'*',schema:'public',table:'config'},()=>loadConfigOnce()).subscribe();
 }
-Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,pasteFromClipboard,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,openRecordSheet,handleSheetBtn,openLightbox,addOption,configureProject});
+Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,pasteFromClipboard,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,openRecordSheet,handleSheetBtn,openLightbox,addOption,toggleProjectSettings,saveProjectSettings});
 initApp();
 </script>
 </body>
