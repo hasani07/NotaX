@@ -6,7 +6,8 @@
 <title>NotaX</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
   --sidebar:#142219;--sidebar-2:#1b2e22;--accent:#2f7355;--accent-dark:#235c44;
@@ -257,6 +258,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
             <option value="project_az">Project A–Z</option><option value="project_za">Project Z–A</option>
             <option value="amount_desc">Nominal terbesar</option><option value="amount_asc">Nominal terkecil</option>
           </select>
+          <button class="btn btn-ghost btn-sm" onclick="exportExcel()">⬇ Export Excel</button>
           <button class="btn btn-ghost btn-sm" onclick="exportCsv()">⬇ Export CSV</button>
         </div>
       </div>
@@ -777,7 +779,7 @@ function matchesSearch_(r,q){
   const hay=(r.desc+' '+r.note+' '+r.uang+' '+r.project).toLowerCase();
   return hay.includes(q);
 }
-function exportCsv(){
+function getExportList_(){
   const fu=document.getElementById('filterUang')?.value||'';
   const fp=document.getElementById('filterProject')?.value||'';
   const q=(document.getElementById('searchQuery')?.value||'').trim().toLowerCase();
@@ -785,13 +787,20 @@ function exportCsv(){
   let list=DATA.records.filter(r=>(!fu||r.uang===fu)&&(!fp||r.project===fp)&&matchesSearch_(r,q));
   const cmp={newest:(a,b)=>(b.createdAt||0)-(a.createdAt||0),oldest:(a,b)=>(a.createdAt||0)-(b.createdAt||0),project_az:(a,b)=>(a.project||'').localeCompare(b.project||'','id'),project_za:(a,b)=>(b.project||'').localeCompare(a.project||'','id'),amount_desc:(a,b)=>b.total-a.total,amount_asc:(a,b)=>a.total-b.total}[sort];
   if(cmp)list.sort(cmp);
-
+  return {list,fp};
+}
+function exportFileName_(fp,ext){
+  const stamp=new Date().toISOString().slice(0,10);
+  return ['notax',fp||'semua-project',stamp].filter(Boolean).join('-').replace(/\s+/g,'_')+'.'+ext;
+}
+function exportCsv(){
+  const {list,fp}=getExportList_();
   if(!list.length)return showToast('Nggak ada data buat di-export (cek filter).','err');
 
-  const header=['Tanggal','Beli Apa','Total','Pakai Uang','Project','Ada Bukti Nota','Catatan','Reimburse','Waktu Simpan'];
+  const header=['Tanggal','Beli Apa','Total','Pakai Uang','Project','Ada Bukti Nota','Catatan','Reimburse','Link Foto Nota','Waktu Simpan'];
   const rows=list.map(r=>[
     r.date||'', r.desc||'', r.total||0, r.uang||'', r.project||'',
-    r.hasReceipt?'Ya':'Tidak', r.note||'', r.reimbursed?'Ya':'Tidak',
+    r.hasReceipt?'Ya':'Tidak', r.note||'', r.reimbursed?'Ya':'Tidak', r.fotoUrl||'',
     r.createdAt?new Date(r.createdAt).toISOString():''
   ]);
   const csv='\uFEFF'+[header,...rows].map(row=>row.map(csvEscape_).join(',')).join('\r\n');
@@ -799,12 +808,55 @@ function exportCsv(){
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  const stamp=new Date().toISOString().slice(0,10);
-  const nameBits=['notax',fp||'semua-project',stamp].filter(Boolean);
-  a.href=url;a.download=nameBits.join('-').replace(/\s+/g,'_')+'.csv';
+  a.href=url;a.download=exportFileName_(fp,'csv');
   document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),2000);
   showToast('✓ CSV diunduh ('+list.length+' catatan).','ok');
+}
+function exportExcel(){
+  if(typeof XLSX==='undefined')return showToast('Library Excel gagal dimuat, cek koneksi internet lalu coba lagi.','err');
+  const {list,fp}=getExportList_();
+  if(!list.length)return showToast('Nggak ada data buat di-export (cek filter).','err');
+
+  const header=['Tanggal','Beli Apa','Total','Pakai Uang','Project','Ada Bukti Nota','Catatan','Reimburse','Link Foto Nota','Waktu Simpan'];
+  const aoa=[header,...list.map(r=>[
+    r.date||'', r.desc||'', Number(r.total)||0, r.uang||'', r.project||'',
+    r.hasReceipt?'Ya':'Tidak', r.note||'', r.reimbursed?'Ya':'Tidak', r.fotoUrl||'',
+    r.createdAt?new Date(r.createdAt):''
+  ])];
+
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+
+  // Lebar kolom biar nggak berantakan
+  ws['!cols']=[{wch:12},{wch:34},{wch:15},{wch:16},{wch:20},{wch:14},{wch:28},{wch:12},{wch:32},{wch:19}];
+
+  // Format kolom Total jadi angka ribuan, dan Waktu Simpan jadi format tanggal
+  const totalCol=2, waktuCol=9;
+  for(let i=1;i<aoa.length;i++){
+    const totalCell=XLSX.utils.encode_cell({r:i,c:totalCol});
+    if(ws[totalCell])ws[totalCell].z='#,##0';
+    const waktuCell=XLSX.utils.encode_cell({r:i,c:waktuCol});
+    if(ws[waktuCell]&&ws[waktuCell].v)ws[waktuCell].z='yyyy-mm-dd hh:mm';
+  }
+
+  // Link Foto Nota jadi hyperlink beneran yang bisa diklik
+  const fotoCol=8;
+  list.forEach((r,idx)=>{
+    if(!r.fotoUrl)return;
+    const cellRef=XLSX.utils.encode_cell({r:idx+1,c:fotoCol});
+    if(ws[cellRef])ws[cellRef].l={Target:r.fotoUrl,Tooltip:'Buka foto nota'};
+  });
+
+  // Header tebal
+  header.forEach((_,c)=>{
+    const cellRef=XLSX.utils.encode_cell({r:0,c});
+    if(ws[cellRef])ws[cellRef].s={font:{bold:true}};
+  });
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,(fp||'Semua Project').slice(0,31));
+  XLSX.writeFile(wb,exportFileName_(fp,'xlsx'));
+  showToast('✓ Excel diunduh ('+list.length+' catatan).','ok');
 }
 function effectiveUang(r){
   // Kalau sudah direimburse, uang itu dianggap sudah "keluar" dari rekening utama,
@@ -984,7 +1036,12 @@ function renderProjectDashboard(){
     `).join('');
   }
 
-  if(typeof Chart==='undefined')return; // Chart.js gagal load (mis. offline), stat & list tetap tampil
+  if(typeof Chart==='undefined'){
+    const msg='<div style="color:var(--ink-faint);font-size:12px;text-align:center;padding-top:90px">Grafik gagal dimuat (cek koneksi internet).</div>';
+    document.getElementById('chartUang').closest('.dash-chart-wrap').innerHTML=msg;
+    document.getElementById('chartMonth').closest('.dash-chart-wrap').innerHTML=msg;
+    return; // stat & list tetap tampil normal
+  }
 
   if(chartUangInstance)chartUangInstance.destroy();
   if(chartMonthInstance)chartMonthInstance.destroy();
@@ -1011,7 +1068,7 @@ async function initApp(){
   supabase.channel('records-changes').on('postgres_changes',{event:'*',schema:'public',table:'records'},()=>loadRecordsOnce()).subscribe();
   supabase.channel('config-changes').on('postgres_changes',{event:'*',schema:'public',table:'config'},()=>loadConfigOnce()).subscribe();
 }
-Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,replaceReceipt,removeReceipt,pasteFromClipboard,updateClipboardUI,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,exportCsv,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,openMainAccountPanel,saveMainAccount,toggleReimburse,renderProjectDashboard});
+Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,replaceReceipt,removeReceipt,pasteFromClipboard,updateClipboardUI,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,exportCsv,exportExcel,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,openMainAccountPanel,saveMainAccount,toggleReimburse,renderProjectDashboard});
 initApp();
 </script>
 </body>
