@@ -202,24 +202,12 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
           <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px">
             <button type="button" class="btn btn-ghost btn-sm" onclick="openManager('project','add')">+ Tambah project</button>
             <button type="button" class="btn btn-danger btn-sm" onclick="openManager('project','delete')">Hapus project</button>
-            <button type="button" class="btn btn-ghost btn-sm" onclick="toggleProjectSettings()">Setting Project</button>
           </div>
 
           <div id="projectAddPanel" style="display:none;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fbfbfa">
             <div class="field" style="margin-bottom:10px">
               <label>Nama project baru</label>
               <input type="text" id="projectNewName" placeholder="mis. T4T, Aset, dll">
-            </div>
-            <div class="field" style="margin-bottom:10px">
-              <label>Link Google Spreadsheet</label>
-              <input type="url" id="projectNewSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/...">
-            </div>
-            <div class="field" style="margin-bottom:10px">
-              <label>Apps Script Web App URL</label>
-              <input type="url" id="projectNewScriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
-            </div>
-            <div class="small-note" style="margin:0 0 10px">
-              Link bisa diubah lagi nanti melalui <b>Setting Project</b>.
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button type="button" class="btn btn-primary btn-sm" onclick="saveManagedOption('project')">Tambah Project</button>
@@ -235,21 +223,6 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
               <button type="button" id="projectDeleteNextBtn" class="btn btn-danger btn-sm" onclick="beginDeleteOption('project')">Lanjut Hapus</button>
               <button type="button" id="projectDeleteFinalBtn" class="btn btn-danger btn-sm" style="display:none" onclick="finalDeleteOption('project')">Ya, Hapus Sekarang</button>
               <button type="button" class="btn btn-ghost btn-sm" onclick="closeManagers()">Batal</button>
-            </div>
-          </div>
-
-          <div id="projectSettingsPanel" style="display:none;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fbfbfa">
-            <div class="field" style="margin-bottom:10px">
-              <label>Link Google Spreadsheet</label>
-              <input type="url" id="projectSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/...">
-            </div>
-            <div class="field" style="margin-bottom:10px">
-              <label>Apps Script Web App URL</label>
-              <input type="url" id="projectScriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" class="btn btn-primary btn-sm" onclick="saveProjectSettings()">Simpan Link</button>
-              <button type="button" class="btn btn-ghost btn-sm" onclick="toggleProjectSettings(false)">Batal</button>
             </div>
           </div>
         </div>
@@ -276,7 +249,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
             <option value="project_az">Project A–Z</option><option value="project_za">Project Z–A</option>
             <option value="amount_desc">Nominal terbesar</option><option value="amount_asc">Nominal terkecil</option>
           </select>
-          <button class="btn btn-ghost btn-sm" onclick="handleSheetBtn()">Buka Spreadsheet</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportCsv()">⬇ Export CSV</button>
         </div>
       </div>
       <div class="board-grid" id="board"></div>
@@ -294,7 +267,7 @@ const SUPABASE_URL = 'https://rfdiydqzeyvzphbwpoxf.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_mJtTaRCwcPooa1oLfOssaw_uYPTKcb0';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let DATA={records:[],options:{uang:["Uang Pribadi","Uang PT"],project:[]},projectLinks:{},cloudName:'',uploadPreset:'',mainAccount:''};
+let DATA={records:[],options:{uang:["Uang Pribadi","Uang PT"],project:[]},cloudName:'',uploadPreset:'',mainAccount:''};
 let noReceipt=false, receiptFile=null, editingId=null, editOriginalRecord=null, existingReceiptUrl='', existingReceiptType='';
 
 function toDbRecord(local){
@@ -321,20 +294,18 @@ async function loadRecordsOnce(){
 }
 async function loadConfigOnce(){
   const {data,error}=await supabase.from('config').select('*'); if(error){console.error(error);return}
-  (data||[]).forEach(r=>{if(r.key==='options'&&r.value)DATA.options=r.value;if(r.key==='projectLinks'&&r.value)DATA.projectLinks=r.value;if(r.key==='cloudinary'&&r.value){DATA.cloudName=r.value.cloudName||'';DATA.uploadPreset=r.value.uploadPreset||''};if(r.key==='mainAccount')DATA.mainAccount=(typeof r.value==='string'?r.value:(r.value&&r.value.name))||''});
+  (data||[]).forEach(r=>{if(r.key==='options'&&r.value)DATA.options=r.value;if(r.key==='cloudinary'&&r.value){DATA.cloudName=r.value.cloudName||'';DATA.uploadPreset=r.value.uploadPreset||''};if(r.key==='mainAccount')DATA.mainAccount=(typeof r.value==='string'?r.value:(r.value&&r.value.name))||''});
   refreshDropdowns();
 }
 async function saveOptions(){const {error}=await supabase.from('config').upsert({key:'options',value:DATA.options});if(error)throw error}
-async function saveProjectLinks(){const {error}=await supabase.from('config').upsert({key:'projectLinks',value:DATA.projectLinks});if(error)throw error}
 async function saveCloudinary(){const {error}=await supabase.from('config').upsert({key:'cloudinary',value:{cloudName:DATA.cloudName||'',uploadPreset:DATA.uploadPreset||''}});if(error)throw error}
 async function saveMainAccountConfig(){const {error}=await supabase.from('config').upsert({key:'mainAccount',value:DATA.mainAccount||''});if(error)throw error}
 function updateMainAccountNote(){
   const el=document.getElementById('mainAccountNote');if(!el)return;
-  el.innerHTML=DATA.mainAccount?`⭐ Rekening utama saat ini: <b>${escapeHtml(DATA.mainAccount)}</b>`:'⚠ Rekening utama belum diatur. Klik "Atur Rekening Utama" di bawah.';
+  el.innerHTML=DATA.mainAccount?`⭐ Rekening utama saat ini: <b>${escapeHtml(DATA.mainAccount)}</b>`:'⚠ Rekening utama belum diatur. Klik "⭐ Atur Rekening Utama" di bawah.';
 }
 function openMainAccountPanel(){
   closeManagers();
-  const settings=document.getElementById('projectSettingsPanel');if(settings)settings.style.display='none';
   fillSelect('mainAccountSelect',DATA.options.uang);
   const sel=document.getElementById('mainAccountSelect');if(sel)sel.value=DATA.mainAccount||'';
   document.getElementById('mainAccountPanel').style.display='block';
@@ -423,32 +394,18 @@ async function saveManagedOption(type){
   }
 
   const oldOptions=[...DATA.options[type]];
-  const oldLinks={...DATA.projectLinks};
   DATA.options[type].push(value);
-
-  if(type==='project'){
-    const sheetUrl=(document.getElementById('projectNewSheetUrl')?.value||'').trim();
-    const scriptUrl=(document.getElementById('projectNewScriptUrl')?.value||'').trim();
-    DATA.projectLinks[value]={sheetUrl,scriptUrl};
-  }
 
   try{
     await saveOptions();
-    if(type==='project')await saveProjectLinks();
 
     refreshDropdowns();
     document.getElementById('f_'+type).value=value;
     closeManagers();
-
-    if(type==='project'){
-      showToast('Project + link Spreadsheet/Apps Script berhasil disimpan.','ok');
-    }else{
-      showToast(label+' berhasil ditambahkan.','ok');
-    }
+    showToast(label+' berhasil ditambahkan.','ok');
   }catch(e){
     console.error(e);
     DATA.options[type]=oldOptions;
-    DATA.projectLinks=oldLinks;
     refreshDropdowns();
     showToast('Gagal menyimpan '+label.toLowerCase()+'.','err');
   }
@@ -477,18 +434,12 @@ async function finalDeleteOption(type){
 
   const label=type==='uang'?'Sumber uang':'Project';
   const oldOptions=[...(DATA.options[type]||[])];
-  const oldLinks={...DATA.projectLinks};
 
   DATA.options[type]=(DATA.options[type]||[]).filter(v=>v!==value);
   const oldMainAccount=DATA.mainAccount;
 
   try{
     await saveOptions();
-
-    if(type==='project' && DATA.projectLinks[value]){
-      delete DATA.projectLinks[value];
-      await saveProjectLinks();
-    }
 
     if(type==='uang' && DATA.mainAccount===value){
       DATA.mainAccount='';
@@ -501,50 +452,9 @@ async function finalDeleteOption(type){
   }catch(e){
     console.error(e);
     DATA.options[type]=oldOptions;
-    DATA.projectLinks=oldLinks;
     DATA.mainAccount=oldMainAccount;
     refreshDropdowns();
     showToast('Gagal menghapus '+label.toLowerCase()+'.','err');
-  }
-}
-function toggleProjectSettings(forceOpen){
-  closeManagers();
-  const project=document.getElementById('f_project').value;
-  if(!project){
-    showToast('Pilih project dulu.','err');
-    return;
-  }
-
-  const panel=document.getElementById('projectSettingsPanel');
-  const shouldOpen=(forceOpen===true)||((forceOpen!==false)&&panel.style.display==='none');
-
-  if(!shouldOpen){
-    panel.style.display='none';
-    return;
-  }
-
-  const cur=getLinkCfg(project);
-  document.getElementById('projectSheetUrl').value=cur.sheetUrl||'';
-  document.getElementById('projectScriptUrl').value=cur.scriptUrl||'';
-  panel.style.display='block';
-}
-
-async function saveProjectSettings(){
-  const project=document.getElementById('f_project').value;
-  if(!project)return showToast('Pilih project dulu.','err');
-
-  const sheetUrl=document.getElementById('projectSheetUrl').value.trim();
-  const scriptUrl=document.getElementById('projectScriptUrl').value.trim();
-
-  DATA.projectLinks[project]={sheetUrl,scriptUrl};
-
-  try{
-    await saveProjectLinks();
-    showToast('Setting project disimpan.','ok');
-    document.getElementById('projectSettingsPanel').style.display='none';
-  }catch(e){
-    console.error(e);
-    showToast('Gagal menyimpan setting project.','err');
   }
 }
 function refreshDropdowns(){
@@ -553,10 +463,6 @@ function refreshDropdowns(){
 function fillSelect(id,list){
   const el=document.getElementById(id),cur=el.value;el.innerHTML='<option value="">— pilih —</option>'+[...new Set(list||[])].map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');if([...el.options].some(o=>o.value===cur))el.value=cur;
 }
-document.getElementById('f_project').addEventListener('change',()=>{
-  const panel=document.getElementById('projectSettingsPanel');
-  if(panel)panel.style.display='none';
-});
 function fillFilter(id,list,label){
   const el=document.getElementById(id),cur=el.value;el.innerHTML=`<option value="">${label}</option>`+[...new Set(list||[])].map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');if([...el.options].some(o=>o.value===cur))el.value=cur;
 }
@@ -813,48 +719,8 @@ async function saveRecord(){
     const rec={id,date,desc,total,uang,project,note,hasReceipt,fotoUrl,receiptType,createdAt,updatedAt:Date.now(),reimbursed:old?.reimbursed||false,reimbursedAt:old?.reimbursedAt||null};
     const query=editingId?supabase.from('records').update(toDbRecord(rec)).eq('id',id):supabase.from('records').insert(toDbRecord(rec));
     const {error}=await query;if(error)throw error;
-    if(editingId)await syncEditedRecordToSheet(old,rec);else await syncNewRecordToSheet(rec);
     showToast(editingId?'✓ Perubahan tersimpan.':'✓ Tersimpan.','ok');resetForm();await loadRecordsOnce();switchView('history');
   }catch(e){console.error(e);showToast('Gagal menyimpan: '+(e.message||e),'err')}
-}
-function getLinkCfg(p){return DATA.projectLinks[p]||{sheetUrl:'',scriptUrl:''}}
-// Ganti dari trik hidden-iframe (asal nembak, gapernah tau hasilnya) ke fetch()
-// asli: bisa deteksi kegagalan jaringan beneran + otomatis retry sebelum nyerah.
-// mode:'no-cors' dipakai karena Apps Script exec URL nggak selalu ngasih header
-// CORS yang bisa dibaca; ini tetap jauh lebih jujur dari iframe karena fetch()
-// akan REJECT kalau jaringan offline/timeout/DNS gagal (iframe nggak bisa itu).
-function sendToSheet(url,maxAttempts=3){
-  function attempt(n){
-    const controller=new AbortController();
-    const timeoutId=setTimeout(()=>controller.abort(),8000);
-    return fetch(url,{method:'GET',mode:'no-cors',cache:'no-store',signal:controller.signal})
-      .then(()=>{clearTimeout(timeoutId);return true})
-      .catch(()=>{
-        clearTimeout(timeoutId);
-        if(n<maxAttempts)return new Promise(r=>setTimeout(r,700*n)).then(()=>attempt(n+1));
-        return false;
-      });
-  }
-  return attempt(1);
-}
-async function syncNewRecordToSheet(r){
-  const cfg=getLinkCfg(r.project);if(!cfg.scriptUrl)return;
-  const payload={id:r.id,tanggal:r.date,beli_apa:r.desc,total:r.total,pakai_uang:r.uang,project:r.project,ada_bukti_nota:r.hasReceipt?'Ya':'Tidak',catatan:r.note,foto_url:r.fotoUrl,reimbursed:r.reimbursed?'Ya':'Tidak'};
-  const sep=cfg.scriptUrl.includes('?')?'&':'?';
-  const ok=await sendToSheet(cfg.scriptUrl+sep+'data='+encodeURIComponent(JSON.stringify(payload))+'&_='+Date.now());
-  if(!ok)showToast('⚠ Sync ke Google Sheet gagal (jaringan). Data aman di database, auto-sync memperbaiki ≤1 menit.','err');
-}
-
-async function syncEditedRecordToSheet(oldRec,newRec){
-  if(oldRec&&oldRec.project!==newRec.project){
-    const oldCfg=getLinkCfg(oldRec.project);if(oldCfg.scriptUrl){const sep=oldCfg.scriptUrl.includes('?')?'&':'?';sendToSheet(oldCfg.scriptUrl+sep+'action=delete&id='+encodeURIComponent(newRec.id)+'&_='+Date.now())}
-    return syncNewRecordToSheet(newRec);
-  }
-  const cfg=getLinkCfg(newRec.project);if(!cfg.scriptUrl)return;
-  const payload={id:newRec.id,tanggal:newRec.date,beli_apa:newRec.desc,total:newRec.total,pakai_uang:newRec.uang,project:newRec.project,ada_bukti_nota:newRec.hasReceipt?'Ya':'Tidak',catatan:newRec.note,foto_url:newRec.fotoUrl,reimbursed:newRec.reimbursed?'Ya':'Tidak'};
-  const sep=cfg.scriptUrl.includes('?')?'&':'?';
-  const ok=await sendToSheet(cfg.scriptUrl+sep+'action=update&data='+encodeURIComponent(JSON.stringify(payload))+'&_='+Date.now());
-  if(!ok)showToast('⚠ Sync ke Google Sheet gagal (jaringan). Data aman di database, auto-sync memperbaiki ≤1 menit.','err');
 }
 async function toggleReimburse(id){
   const r=DATA.records.find(x=>x.id===id);if(!r)return;
@@ -863,15 +729,49 @@ async function toggleReimburse(id){
   const newAt=newState?new Date().toISOString():null;
   const {error}=await supabase.from('records').update({reimbursed:newState,reimbursed_at:newAt}).eq('id',id);
   if(error){console.error(error);return showToast('Gagal update status reimburse.','err')}
-  const updated={...r,reimbursed:newState,reimbursedAt:newAt};
-  syncEditedRecordToSheet(r,updated).catch(e=>console.error(e));
   showToast(newState?'✓ Ditandai sudah direimburse.':'Status reimburse dibatalkan.','ok');
   await loadRecordsOnce();
 }
 async function deleteRecord(id){
-  if(!confirm('Hapus catatan ini?'))return;const rec=DATA.records.find(r=>r.id===id);const {error}=await supabase.from('records').delete().eq('id',id);if(error)return showToast('Gagal menghapus.','err');
-  if(rec){const cfg=getLinkCfg(rec.project);if(cfg.scriptUrl){const sep=cfg.scriptUrl.includes('?')?'&':'?';sendToSheet(cfg.scriptUrl+sep+'action=delete&id='+encodeURIComponent(id)+'&_='+Date.now())}}
+  if(!confirm('Hapus catatan ini?'))return;const {error}=await supabase.from('records').delete().eq('id',id);if(error)return showToast('Gagal menghapus.','err');
   showToast('Catatan dihapus.','ok');await loadRecordsOnce();
+}
+// ============================================================
+// EXPORT CSV — export data yang lagi ditampilkan (ikut filter &
+// sort yang aktif di Riwayat Belanja) jadi file .csv, siap dibuka
+// di Excel/Google Sheets/dst.
+// ============================================================
+function csvEscape_(val){
+  const s=(val===null||val===undefined)?'':String(val);
+  return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function exportCsv(){
+  const fu=document.getElementById('filterUang')?.value||'';
+  const fp=document.getElementById('filterProject')?.value||'';
+  const sort=document.getElementById('sortMode')?.value||'newest';
+  let list=DATA.records.filter(r=>(!fu||r.uang===fu)&&(!fp||r.project===fp));
+  const cmp={newest:(a,b)=>(b.createdAt||0)-(a.createdAt||0),oldest:(a,b)=>(a.createdAt||0)-(b.createdAt||0),project_az:(a,b)=>(a.project||'').localeCompare(b.project||'','id'),project_za:(a,b)=>(b.project||'').localeCompare(a.project||'','id'),amount_desc:(a,b)=>b.total-a.total,amount_asc:(a,b)=>a.total-b.total}[sort];
+  if(cmp)list.sort(cmp);
+
+  if(!list.length)return showToast('Nggak ada data buat di-export (cek filter).','err');
+
+  const header=['Tanggal','Beli Apa','Total','Pakai Uang','Project','Ada Bukti Nota','Catatan','Reimburse','Waktu Simpan'];
+  const rows=list.map(r=>[
+    r.date||'', r.desc||'', r.total||0, r.uang||'', r.project||'',
+    r.hasReceipt?'Ya':'Tidak', r.note||'', r.reimbursed?'Ya':'Tidak',
+    r.createdAt?new Date(r.createdAt).toISOString():''
+  ]);
+  const csv='\uFEFF'+[header,...rows].map(row=>row.map(csvEscape_).join(',')).join('\r\n');
+
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const stamp=new Date().toISOString().slice(0,10);
+  const nameBits=['notax',fp||'semua-project',stamp].filter(Boolean);
+  a.href=url;a.download=nameBits.join('-').replace(/\s+/g,'_')+'.csv';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  showToast('✓ CSV diunduh ('+list.length+' catatan).','ok');
 }
 function effectiveUang(r){
   // Kalau sudah direimburse, uang itu dianggap sudah "keluar" dari rekening utama,
@@ -930,11 +830,9 @@ function renderBoard(){
         ? `<div class="reimburse-row"><div class="reimburse-status ok">✓ Sudah direimburse${r.reimbursedAt?(' · '+fmtDateTime(r.reimbursedAt)):''}<button class="btn btn-ghost btn-sm" onclick="toggleReimburse('${escJs(r.id)}')">Batalkan</button></div></div>`
         : `<div class="reimburse-row"><button class="btn btn-sm btn-reimburse" onclick="toggleReimburse('${escJs(r.id)}')">💰 Tandai Sudah Direimburse</button></div>`;
     }
-    return `<div class="item"><div class="item-top"><div><div class="item-desc">${escapeHtml(r.desc||'(tanpa keterangan)')}</div><div class="item-date">${fmtDate(r.date)}</div></div><div class="item-amt">${fmtRp(r.total)}</div></div>${media}${r.note?`<div class="item-note">${escapeHtml(r.note)}</div>`:''}<div class="badges"><span class="badge uang">${escapeHtml(r.uang)}</span><span class="badge project">${escapeHtml(r.project)}</span>${reimburseBadge}</div>${reimburseRow}<div class="item-actions"><button class="sheet-link-btn" onclick="openRecordSheet('${escJs(r.project)}')">Spreadsheet</button><div class="action-group"><button class="btn btn-ghost btn-sm" onclick="editRecord('${escJs(r.id)}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteRecord('${escJs(r.id)}')">Hapus</button></div></div></div>`;
+    return `<div class="item"><div class="item-top"><div><div class="item-desc">${escapeHtml(r.desc||'(tanpa keterangan)')}</div><div class="item-date">${fmtDate(r.date)}</div></div><div class="item-amt">${fmtRp(r.total)}</div></div>${media}${r.note?`<div class="item-note">${escapeHtml(r.note)}</div>`:''}<div class="badges"><span class="badge uang">${escapeHtml(r.uang)}</span><span class="badge project">${escapeHtml(r.project)}</span>${reimburseBadge}</div>${reimburseRow}<div class="item-actions"><div class="action-group" style="margin-left:auto"><button class="btn btn-ghost btn-sm" onclick="editRecord('${escJs(r.id)}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteRecord('${escJs(r.id)}')">Hapus</button></div></div></div>`;
   }).join('');
 }
-function openRecordSheet(project){const c=getLinkCfg(project);if(c.sheetUrl)window.open(c.sheetUrl,'_blank');else showToast('Belum ada link spreadsheet untuk project ini.','err')}
-function handleSheetBtn(){const p=document.getElementById('filterProject').value;if(!p)return showToast('Pilih project dulu.','err');openRecordSheet(p)}
 function openLightbox(src){document.getElementById('lightboxImg').src=src;document.getElementById('lightbox').classList.add('open')}
 
 async function initApp(){
@@ -944,7 +842,7 @@ async function initApp(){
   supabase.channel('records-changes').on('postgres_changes',{event:'*',schema:'public',table:'records'},()=>loadRecordsOnce()).subscribe();
   supabase.channel('config-changes').on('postgres_changes',{event:'*',schema:'public',table:'config'},()=>loadConfigOnce()).subscribe();
 }
-Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,replaceReceipt,removeReceipt,pasteFromClipboard,updateClipboardUI,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,openRecordSheet,handleSheetBtn,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,toggleProjectSettings,saveProjectSettings,openMainAccountPanel,saveMainAccount,toggleReimburse});
+Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,replaceReceipt,removeReceipt,pasteFromClipboard,updateClipboardUI,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,exportCsv,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,openMainAccountPanel,saveMainAccount,toggleReimburse});
 initApp();
 </script>
 </body>
