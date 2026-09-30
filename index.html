@@ -818,21 +818,43 @@ async function saveRecord(){
   }catch(e){console.error(e);showToast('Gagal menyimpan: '+(e.message||e),'err')}
 }
 function getLinkCfg(p){return DATA.projectLinks[p]||{sheetUrl:'',scriptUrl:''}}
-function sendViaIframe(url){return new Promise(resolve=>{const f=document.createElement('iframe');f.style.display='none';f.onload=()=>{setTimeout(()=>f.remove(),300);resolve()};f.onerror=()=>{f.remove();resolve()};f.src=url;document.body.appendChild(f);setTimeout(()=>{if(f.parentNode)f.remove();resolve()},7000)})}
+// Ganti dari trik hidden-iframe (asal nembak, gapernah tau hasilnya) ke fetch()
+// asli: bisa deteksi kegagalan jaringan beneran + otomatis retry sebelum nyerah.
+// mode:'no-cors' dipakai karena Apps Script exec URL nggak selalu ngasih header
+// CORS yang bisa dibaca; ini tetap jauh lebih jujur dari iframe karena fetch()
+// akan REJECT kalau jaringan offline/timeout/DNS gagal (iframe nggak bisa itu).
+function sendToSheet(url,maxAttempts=3){
+  function attempt(n){
+    const controller=new AbortController();
+    const timeoutId=setTimeout(()=>controller.abort(),8000);
+    return fetch(url,{method:'GET',mode:'no-cors',cache:'no-store',signal:controller.signal})
+      .then(()=>{clearTimeout(timeoutId);return true})
+      .catch(()=>{
+        clearTimeout(timeoutId);
+        if(n<maxAttempts)return new Promise(r=>setTimeout(r,700*n)).then(()=>attempt(n+1));
+        return false;
+      });
+  }
+  return attempt(1);
+}
 async function syncNewRecordToSheet(r){
   const cfg=getLinkCfg(r.project);if(!cfg.scriptUrl)return;
   const payload={id:r.id,tanggal:r.date,beli_apa:r.desc,total:r.total,pakai_uang:r.uang,project:r.project,ada_bukti_nota:r.hasReceipt?'Ya':'Tidak',catatan:r.note,foto_url:r.fotoUrl,reimbursed:r.reimbursed?'Ya':'Tidak'};
-  const sep=cfg.scriptUrl.includes('?')?'&':'?';await sendViaIframe(cfg.scriptUrl+sep+'data='+encodeURIComponent(JSON.stringify(payload))+'&_='+Date.now());
+  const sep=cfg.scriptUrl.includes('?')?'&':'?';
+  const ok=await sendToSheet(cfg.scriptUrl+sep+'data='+encodeURIComponent(JSON.stringify(payload))+'&_='+Date.now());
+  if(!ok)showToast('⚠ Sync ke Google Sheet gagal (jaringan). Data aman di database, auto-sync memperbaiki ≤1 menit.','err');
 }
 
 async function syncEditedRecordToSheet(oldRec,newRec){
   if(oldRec&&oldRec.project!==newRec.project){
-    const oldCfg=getLinkCfg(oldRec.project);if(oldCfg.scriptUrl){const sep=oldCfg.scriptUrl.includes('?')?'&':'?';sendViaIframe(oldCfg.scriptUrl+sep+'action=delete&id='+encodeURIComponent(newRec.id)+'&_='+Date.now())}
+    const oldCfg=getLinkCfg(oldRec.project);if(oldCfg.scriptUrl){const sep=oldCfg.scriptUrl.includes('?')?'&':'?';sendToSheet(oldCfg.scriptUrl+sep+'action=delete&id='+encodeURIComponent(newRec.id)+'&_='+Date.now())}
     return syncNewRecordToSheet(newRec);
   }
   const cfg=getLinkCfg(newRec.project);if(!cfg.scriptUrl)return;
   const payload={id:newRec.id,tanggal:newRec.date,beli_apa:newRec.desc,total:newRec.total,pakai_uang:newRec.uang,project:newRec.project,ada_bukti_nota:newRec.hasReceipt?'Ya':'Tidak',catatan:newRec.note,foto_url:newRec.fotoUrl,reimbursed:newRec.reimbursed?'Ya':'Tidak'};
-  const sep=cfg.scriptUrl.includes('?')?'&':'?';await sendViaIframe(cfg.scriptUrl+sep+'action=update&data='+encodeURIComponent(JSON.stringify(payload))+'&_='+Date.now());
+  const sep=cfg.scriptUrl.includes('?')?'&':'?';
+  const ok=await sendToSheet(cfg.scriptUrl+sep+'action=update&data='+encodeURIComponent(JSON.stringify(payload))+'&_='+Date.now());
+  if(!ok)showToast('⚠ Sync ke Google Sheet gagal (jaringan). Data aman di database, auto-sync memperbaiki ≤1 menit.','err');
 }
 async function toggleReimburse(id){
   const r=DATA.records.find(x=>x.id===id);if(!r)return;
@@ -848,7 +870,7 @@ async function toggleReimburse(id){
 }
 async function deleteRecord(id){
   if(!confirm('Hapus catatan ini?'))return;const rec=DATA.records.find(r=>r.id===id);const {error}=await supabase.from('records').delete().eq('id',id);if(error)return showToast('Gagal menghapus.','err');
-  if(rec){const cfg=getLinkCfg(rec.project);if(cfg.scriptUrl){const sep=cfg.scriptUrl.includes('?')?'&':'?';sendViaIframe(cfg.scriptUrl+sep+'action=delete&id='+encodeURIComponent(id)+'&_='+Date.now())}}
+  if(rec){const cfg=getLinkCfg(rec.project);if(cfg.scriptUrl){const sep=cfg.scriptUrl.includes('?')?'&':'?';sendToSheet(cfg.scriptUrl+sep+'action=delete&id='+encodeURIComponent(id)+'&_='+Date.now())}}
   showToast('Catatan dihapus.','ok');await loadRecordsOnce();
 }
 function effectiveUang(r){
@@ -922,7 +944,7 @@ async function initApp(){
   supabase.channel('records-changes').on('postgres_changes',{event:'*',schema:'public',table:'records'},()=>loadRecordsOnce()).subscribe();
   supabase.channel('config-changes').on('postgres_changes',{event:'*',schema:'public',table:'config'},()=>loadConfigOnce()).subscribe();
 }
-Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,replaceReceipt,removeReceipt,pasteFromClipboard,updateClipboardUI,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,openRecordSheet,handleSheetBtn,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,toggleProjectSettings,saveProjectSettings});
+Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,replaceReceipt,removeReceipt,pasteFromClipboard,updateClipboardUI,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,openRecordSheet,handleSheetBtn,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,toggleProjectSettings,saveProjectSettings,openMainAccountPanel,saveMainAccount,toggleReimburse});
 initApp();
 </script>
 </body>
