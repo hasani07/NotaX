@@ -6,6 +6,7 @@
 <title>NotaX</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
 :root{
   --sidebar:#142219;--sidebar-2:#1b2e22;--accent:#2f7355;--accent-dark:#235c44;
@@ -36,7 +37,11 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .board-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.board-filters{display:flex;gap:8px;flex-wrap:wrap}.board-filters select{padding:9px 30px 9px 13px;font-size:12.5px;width:auto;min-width:150px}.board-count{font-size:12px;color:var(--ink-faint);margin-left:6px}
 .board-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}.item{background:#fbfbfa;border:1px solid var(--line);border-radius:13px;padding:16px 17px}.item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.item-desc{font-weight:700;font-size:14px}.item-date{font-size:11px;color:var(--ink-faint);font-family:"IBM Plex Mono";margin-top:2px}.item-amt{font-family:"IBM Plex Mono";font-size:15.5px;font-weight:700;color:var(--accent-dark);white-space:nowrap}.item-note{font-size:12px;color:var(--ink-soft);margin-top:9px;font-style:italic}.item-thumb{max-width:100%;max-height:160px;border-radius:8px;margin-top:10px;display:block;border:1px solid var(--line);cursor:zoom-in}.pdf-card{margin-top:10px;border:1px solid var(--line);border-radius:9px;padding:11px 12px;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px}.pdf-card a{color:var(--accent-dark);font-weight:700;text-decoration:none}.no-receipt{font-size:11px;color:var(--red);margin-top:10px;font-weight:500}.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}.badge{font-size:10.5px;padding:4px 9px;border-radius:20px;color:#fff;font-weight:600}.badge.uang{background:var(--red)}.badge.project{background:var(--teal)}.badge.reimbursed{background:var(--accent-bright);color:#0b2417}
 .reimburse-row{margin-top:10px}.reimburse-status{font-size:12px;display:flex;align-items:center;flex-wrap:wrap;gap:8px}.reimburse-status.ok{color:var(--accent-dark);font-weight:700}.btn-reimburse{background:#fff4e0;border:1px solid #f0d9a8;color:#8a6210}.btn-reimburse:hover{background:#ffe9c7}
-.main-account-banner{border:1px solid #f0d9a8;background:#fff8ec;color:#8a6210;border-radius:13px;padding:14px 18px;margin-bottom:14px;font-size:12.5px;line-height:1.5;grid-column:1/-1}.main-account-banner b{font-weight:800}.item-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:11px;padding-top:11px;border-top:1px dashed var(--line)}.action-group{display:flex;gap:7px;flex-wrap:wrap}.sheet-link-btn{font-size:11.5px;color:var(--accent);font-weight:600;background:none;border:none;cursor:pointer;padding:0}
+.main-account-banner{border:1px solid #f0d9a8;background:#fff8ec;color:#8a6210;border-radius:13px;padding:14px 18px;margin-bottom:14px;font-size:12.5px;line-height:1.5;grid-column:1/-1}.main-account-banner b{font-weight:800}
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}.dash-chart-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 24px}.dash-chart-card h3{margin:0 0 16px;font-size:13.5px;color:var(--ink-soft)}.dash-chart-wrap{position:relative;height:240px}
+.dash-empty{color:var(--ink-faint);font-size:13px;text-align:center;padding:56px 20px;background:#fbfbfa;border:1.5px dashed var(--line);border-radius:14px}
+.dash-pending-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-bottom:1px dashed var(--line)}.dash-pending-item:last-child{border-bottom:none}.dash-pending-main{min-width:0}.dash-pending-desc{font-weight:700;font-size:13px}.dash-pending-meta{font-size:11px;color:var(--ink-faint);margin-top:2px}.dash-pending-amt{font-family:"IBM Plex Mono";font-weight:700;font-size:13.5px;white-space:nowrap}
+@media(max-width:820px){.dash-grid{grid-template-columns:1fr}}.item-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:11px;padding-top:11px;border-top:1px dashed var(--line)}.action-group{display:flex;gap:7px;flex-wrap:wrap}.sheet-link-btn{font-size:11.5px;color:var(--accent);font-weight:600;background:none;border:none;cursor:pointer;padding:0}
 .empty{color:var(--ink-faint);font-size:13px;text-align:center;padding:56px 20px;background:#fbfbfa;border:1.5px dashed var(--line);border-radius:14px;grid-column:1/-1}
 .lightbox{position:fixed;inset:0;background:rgba(10,14,10,.85);display:none;align-items:center;justify-content:center;z-index:50;padding:30px;cursor:zoom-out}.lightbox.open{display:flex}.lightbox img{max-width:100%;max-height:100%;border-radius:8px}
 .toast-wrap{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:70;display:flex;flex-direction:column;gap:8px}.toast{background:var(--ink);color:#fff;padding:11px 18px;border-radius:9px;font-size:13px;box-shadow:0 8px 20px rgba(0,0,0,.25)}.toast.err{background:var(--red)}.toast.ok{background:var(--accent-dark)}
@@ -107,7 +112,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   <div class="brand"><div class="brand-mark">🧾</div><div class="brand-name">Nota<span>X</span></div></div>
   <div class="nav-item active" id="navHome" onclick="switchView('home')">＋ Papan Nota</div>
   <div class="nav-item" id="navHistory" onclick="switchView('history')">▦ Riwayat Belanja</div>
-  <div class="sidebar-footer"><div class="sidebar-card"><div class="name">Nota<span>X</span></div><p>Catat, kelola, edit, dan kontrol pengeluaran proyek.</p></div><div class="sidebar-copyright">© 2026 NotaX<br>build v19-reimburse</div></div>
+  <div class="nav-item" id="navDashboard" onclick="switchView('dashboard')">📊 Detail Project</div>
+  <div class="sidebar-footer"><div class="sidebar-card"><div class="name">Nota<span>X</span></div><p>Catat, kelola, edit, dan kontrol pengeluaran proyek.</p></div><div class="sidebar-copyright">© 2026 NotaX<br>build v20-dashboard</div></div>
 </div>
 
 <div class="main">
@@ -255,6 +261,17 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
       <div class="board-grid" id="board"></div>
     </div>
   </div>
+
+  <div class="view" id="viewDashboard">
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><div class="card-header-left"><h2 style="font-size:17px">📊 Detail Project</h2></div></div>
+      <div class="field" style="margin-bottom:0">
+        <label>Pilih project</label>
+        <select id="dashProjectSelect" onchange="renderProjectDashboard()"></select>
+      </div>
+    </div>
+    <div id="dashboardContent"></div>
+  </div>
 </div>
 
 <div class="lightbox" id="lightbox" onclick="this.classList.remove('open')"><img id="lightboxImg"></div>
@@ -291,6 +308,7 @@ async function loadRecordsOnce(){
   const {data,error}=await supabase.from('records').select('*').order('created_at',{ascending:false});
   if(error){console.error(error);showToast('Gagal memuat data.','err');return}
   DATA.records=(data||[]).map(fromDbRecord);renderBoard();
+  if(document.getElementById('viewDashboard')?.classList.contains('active'))renderProjectDashboard();
 }
 async function loadConfigOnce(){
   const {data,error}=await supabase.from('config').select('*'); if(error){console.error(error);return}
@@ -459,6 +477,8 @@ async function finalDeleteOption(type){
 }
 function refreshDropdowns(){
   fillSelect('f_uang',DATA.options.uang);fillSelect('f_project',DATA.options.project);fillFilter('filterUang',DATA.options.uang,'Semua sumber uang');fillFilter('filterProject',DATA.options.project,'Semua project');updateMainAccountNote();
+  const dashSel=document.getElementById('dashProjectSelect');
+  if(dashSel){const cur=dashSel.value;fillSelect('dashProjectSelect',DATA.options.project);if(!dashSel.value&&DATA.options.project.length)dashSel.value=cur||DATA.options.project[0];}
 }
 function fillSelect(id,list){
   const el=document.getElementById(id),cur=el.value;el.innerHTML='<option value="">— pilih —</option>'+[...new Set(list||[])].map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');if([...el.options].some(o=>o.value===cur))el.value=cur;
@@ -467,8 +487,9 @@ function fillFilter(id,list,label){
   const el=document.getElementById(id),cur=el.value;el.innerHTML=`<option value="">${label}</option>`+[...new Set(list||[])].map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');if([...el.options].some(o=>o.value===cur))el.value=cur;
 }
 function switchView(v){
-  document.getElementById('viewHome').classList.toggle('active',v==='home');document.getElementById('viewHistory').classList.toggle('active',v==='history');
-  document.getElementById('navHome').classList.toggle('active',v==='home');document.getElementById('navHistory').classList.toggle('active',v==='history');
+  document.getElementById('viewHome').classList.toggle('active',v==='home');document.getElementById('viewHistory').classList.toggle('active',v==='history');document.getElementById('viewDashboard').classList.toggle('active',v==='dashboard');
+  document.getElementById('navHome').classList.toggle('active',v==='home');document.getElementById('navHistory').classList.toggle('active',v==='history');document.getElementById('navDashboard').classList.toggle('active',v==='dashboard');
+  if(v==='dashboard')renderProjectDashboard();
 }
 document.getElementById('f_total').addEventListener('input',e=>{let raw=e.target.value.replace(/\D/g,'');e.target.value=raw?Number(raw).toLocaleString('id-ID'):''});
 
@@ -833,6 +854,97 @@ function renderBoard(){
     return `<div class="item"><div class="item-top"><div><div class="item-desc">${escapeHtml(r.desc||'(tanpa keterangan)')}</div><div class="item-date">${fmtDate(r.date)}</div></div><div class="item-amt">${fmtRp(r.total)}</div></div>${media}${r.note?`<div class="item-note">${escapeHtml(r.note)}</div>`:''}<div class="badges"><span class="badge uang">${escapeHtml(r.uang)}</span><span class="badge project">${escapeHtml(r.project)}</span>${reimburseBadge}</div>${reimburseRow}<div class="item-actions"><div class="action-group" style="margin-left:auto"><button class="btn btn-ghost btn-sm" onclick="editRecord('${escJs(r.id)}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteRecord('${escJs(r.id)}')">Hapus</button></div></div></div>`;
   }).join('');
 }
+
+// ============================================================
+// DASHBOARD PER-PROJECT: total, grafik per sumber uang, grafik
+// tren bulanan, dan daftar yang belum direimburse.
+// ============================================================
+let chartUangInstance=null, chartMonthInstance=null;
+const DASH_COLORS=['#2f7355','#c15a4a','#2f7373','#b98900','#7a5cc9','#c94f8f','#4a7fc1','#8a9a4a'];
+function monthLabel_(ym){
+  const [y,m]=ym.split('-');
+  return new Date(Number(y),Number(m)-1,1).toLocaleDateString('id-ID',{month:'short',year:'2-digit'});
+}
+function renderProjectDashboard(){
+  const sel=document.getElementById('dashProjectSelect');
+  const container=document.getElementById('dashboardContent');
+  if(!sel||!container)return;
+  if(!sel.value&&DATA.options.project.length)sel.value=DATA.options.project[0];
+  const project=sel.value;
+
+  if(!project){
+    container.innerHTML='<div class="dash-empty"><b>Belum ada project.</b><br>Tambah project dulu di Papan Nota.</div>';
+    return;
+  }
+
+  const list=DATA.records.filter(r=>r.project===project);
+  if(!list.length){
+    container.innerHTML='<div class="dash-empty"><b>Belum ada nota untuk project ini.</b></div>';
+    return;
+  }
+
+  const total=list.reduce((s,r)=>s+Number(r.total||0),0);
+  const pendingList=list.filter(r=>DATA.mainAccount&&r.uang!==DATA.mainAccount&&!r.reimbursed).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const pendingTotal=pendingList.reduce((s,r)=>s+Number(r.total||0),0);
+  const reimbursedTotal=list.filter(r=>r.reimbursed).reduce((s,r)=>s+Number(r.total||0),0);
+
+  const sumsByUang={};
+  list.forEach(r=>{sumsByUang[r.uang]=(sumsByUang[r.uang]||0)+Number(r.total||0)});
+
+  const sumsByMonth={};
+  list.forEach(r=>{if(!r.date)return;const ym=r.date.slice(0,7);sumsByMonth[ym]=(sumsByMonth[ym]||0)+Number(r.total||0)});
+  const months=Object.keys(sumsByMonth).sort();
+
+  container.innerHTML=`
+    <div class="stats" style="margin-bottom:20px">
+      <div class="stat-card" style="min-width:210px;border-color:#bfd8c7;background:#f4faf6"><div class="label">Total Pengeluaran</div><div class="val">${fmtRp(total)}</div></div>
+      <div class="stat-card"><div class="label">Jumlah Transaksi</div><div class="val">${list.length}</div></div>
+      <div class="stat-card" style="${pendingTotal>0?'border-color:#f0d9a8;background:#fff8ec':''}"><div class="label" style="${pendingTotal>0?'color:#8a6210':''}">Belum Direimburse</div><div class="val" style="${pendingTotal>0?'color:#8a6210':''}">${fmtRp(pendingTotal)}</div></div>
+      <div class="stat-card"><div class="label">Sudah Direimburse</div><div class="val">${fmtRp(reimbursedTotal)}</div></div>
+    </div>
+    <div class="dash-grid">
+      <div class="dash-chart-card"><h3>Pengeluaran per Sumber Uang</h3><div class="dash-chart-wrap"><canvas id="chartUang"></canvas></div></div>
+      <div class="dash-chart-card"><h3>Tren Pengeluaran per Bulan</h3><div class="dash-chart-wrap"><canvas id="chartMonth"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-header-left"><h2 style="font-size:15px">💰 Belum Direimburse${pendingList.length?` (${pendingList.length})`:''}</h2></div></div>
+      <div id="dashPendingList">${pendingList.length?'':'<div class="dash-empty">Semua nota project ini sudah direimburse (atau memang belum diatur rekening utamanya).</div>'}</div>
+    </div>
+  `;
+
+  if(pendingList.length){
+    document.getElementById('dashPendingList').innerHTML=pendingList.map(r=>`
+      <div class="dash-pending-item">
+        <div class="dash-pending-main">
+          <div class="dash-pending-desc">${escapeHtml(r.desc||'(tanpa keterangan)')}</div>
+          <div class="dash-pending-meta">${fmtDate(r.date)} · ${escapeHtml(r.uang)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="dash-pending-amt">${fmtRp(r.total)}</div>
+          <button class="btn btn-sm btn-reimburse" onclick="toggleReimburse('${escJs(r.id)}')">Tandai</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  if(typeof Chart==='undefined')return; // Chart.js gagal load (mis. offline), stat & list tetap tampil
+
+  if(chartUangInstance)chartUangInstance.destroy();
+  if(chartMonthInstance)chartMonthInstance.destroy();
+
+  const uangLabels=Object.keys(sumsByUang);
+  chartUangInstance=new Chart(document.getElementById('chartUang'),{
+    type:'doughnut',
+    data:{labels:uangLabels,datasets:[{data:uangLabels.map(k=>sumsByUang[k]),backgroundColor:uangLabels.map((_,i)=>DASH_COLORS[i%DASH_COLORS.length])}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:11,font:{size:11}}}}}
+  });
+
+  chartMonthInstance=new Chart(document.getElementById('chartMonth'),{
+    type:'bar',
+    data:{labels:months.map(monthLabel_),datasets:[{label:'Pengeluaran',data:months.map(m=>sumsByMonth[m]),backgroundColor:'#2f7355',borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'Rp'+(v/1000)+'rb'}}}}
+  });
+}
 function openLightbox(src){document.getElementById('lightboxImg').src=src;document.getElementById('lightbox').classList.add('open')}
 
 async function initApp(){
@@ -842,7 +954,7 @@ async function initApp(){
   supabase.channel('records-changes').on('postgres_changes',{event:'*',schema:'public',table:'records'},()=>loadRecordsOnce()).subscribe();
   supabase.channel('config-changes').on('postgres_changes',{event:'*',schema:'public',table:'config'},()=>loadConfigOnce()).subscribe();
 }
-Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,replaceReceipt,removeReceipt,pasteFromClipboard,updateClipboardUI,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,exportCsv,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,openMainAccountPanel,saveMainAccount,toggleReimburse});
+Object.assign(window,{switchView,handleDropZoneClick,openFilePicker,replaceReceipt,removeReceipt,pasteFromClipboard,updateClipboardUI,toggleNoReceipt,resetForm,cancelEdit,saveRecord,deleteRecord,editRecord,renderBoard,exportCsv,openLightbox,openManager,closeManagers,saveManagedOption,beginDeleteOption,finalDeleteOption,openMainAccountPanel,saveMainAccount,toggleReimburse,renderProjectDashboard});
 initApp();
 </script>
 </body>
