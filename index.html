@@ -41,6 +41,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}.dash-chart-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 24px}.dash-chart-card h3{margin:0 0 16px;font-size:13.5px;color:var(--ink-soft)}.dash-chart-wrap{position:relative;height:240px}
 .dash-empty{color:var(--ink-faint);font-size:13px;text-align:center;padding:56px 20px;background:#fbfbfa;border:1.5px dashed var(--line);border-radius:14px}
 .dash-pending-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-bottom:1px dashed var(--line)}.dash-pending-item:last-child{border-bottom:none}.dash-pending-main{min-width:0}.dash-pending-desc{font-weight:700;font-size:13px}.dash-pending-meta{font-size:11px;color:var(--ink-faint);margin-top:2px}.dash-pending-amt{font-family:"IBM Plex Mono";font-weight:700;font-size:13.5px;white-space:nowrap}
+.cross-table{width:100%;border-collapse:collapse;font-size:12.5px}.cross-table th{text-align:left;padding:9px 10px;color:var(--ink-soft);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid var(--line)}.cross-table td{padding:9px 10px;border-bottom:1px solid var(--line)}.cross-table td.amt{font-family:"IBM Plex Mono";font-weight:700;text-align:right;white-space:nowrap}.cross-table tr.total-row td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
 @media(max-width:820px){.dash-grid{grid-template-columns:1fr}}.item-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:11px;padding-top:11px;border-top:1px dashed var(--line)}.action-group{display:flex;gap:7px;flex-wrap:wrap}.sheet-link-btn{font-size:11.5px;color:var(--accent);font-weight:600;background:none;border:none;cursor:pointer;padding:0}
 .empty{color:var(--ink-faint);font-size:13px;text-align:center;padding:56px 20px;background:#fbfbfa;border:1.5px dashed var(--line);border-radius:14px;grid-column:1/-1}
 .lightbox{position:fixed;inset:0;background:rgba(10,14,10,.85);display:none;align-items:center;justify-content:center;z-index:50;padding:30px;cursor:zoom-out}.lightbox.open{display:flex}.lightbox img{max-width:100%;max-height:100%;border-radius:8px}
@@ -248,6 +249,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
       <div class="board-toolbar">
         <div class="card-header-left"><h2 style="font-size:17px">Riwayat Belanja<span class="board-count" id="boardCount"></span></h2></div>
         <div class="board-filters">
+          <input type="text" id="searchQuery" placeholder="🔍 Cari nota (keterangan/catatan)..." oninput="renderBoard()" style="min-width:200px;padding:9px 13px;font-size:12.5px;border:1px solid var(--line);border-radius:10px;background:#fbfbfa">
           <select id="filterUang" onchange="renderBoard()"><option value="">Semua sumber uang</option></select>
           <select id="filterProject" onchange="renderBoard()"><option value="">Semua project</option></select>
           <select id="sortMode" onchange="renderBoard()">
@@ -263,6 +265,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   </div>
 
   <div class="view" id="viewDashboard">
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><div class="card-header-left"><h2 style="font-size:17px">💰 Ringkasan Belum Direimburse — Semua Project</h2></div></div>
+      <div id="crossProjectPending"></div>
+    </div>
     <div class="card" style="margin-bottom:20px">
       <div class="card-header"><div class="card-header-left"><h2 style="font-size:17px">📊 Detail Project</h2></div></div>
       <div class="field" style="margin-bottom:0">
@@ -308,7 +314,7 @@ async function loadRecordsOnce(){
   const {data,error}=await supabase.from('records').select('*').order('created_at',{ascending:false});
   if(error){console.error(error);showToast('Gagal memuat data.','err');return}
   DATA.records=(data||[]).map(fromDbRecord);renderBoard();
-  if(document.getElementById('viewDashboard')?.classList.contains('active'))renderProjectDashboard();
+  if(document.getElementById('viewDashboard')?.classList.contains('active')){renderCrossProjectPending();renderProjectDashboard();}
 }
 async function loadConfigOnce(){
   const {data,error}=await supabase.from('config').select('*'); if(error){console.error(error);return}
@@ -489,7 +495,7 @@ function fillFilter(id,list,label){
 function switchView(v){
   document.getElementById('viewHome').classList.toggle('active',v==='home');document.getElementById('viewHistory').classList.toggle('active',v==='history');document.getElementById('viewDashboard').classList.toggle('active',v==='dashboard');
   document.getElementById('navHome').classList.toggle('active',v==='home');document.getElementById('navHistory').classList.toggle('active',v==='history');document.getElementById('navDashboard').classList.toggle('active',v==='dashboard');
-  if(v==='dashboard')renderProjectDashboard();
+  if(v==='dashboard'){renderCrossProjectPending();renderProjectDashboard();}
 }
 document.getElementById('f_total').addEventListener('input',e=>{let raw=e.target.value.replace(/\D/g,'');e.target.value=raw?Number(raw).toLocaleString('id-ID'):''});
 
@@ -766,11 +772,17 @@ function csvEscape_(val){
   const s=(val===null||val===undefined)?'':String(val);
   return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
 }
+function matchesSearch_(r,q){
+  if(!q)return true;
+  const hay=(r.desc+' '+r.note+' '+r.uang+' '+r.project).toLowerCase();
+  return hay.includes(q);
+}
 function exportCsv(){
   const fu=document.getElementById('filterUang')?.value||'';
   const fp=document.getElementById('filterProject')?.value||'';
+  const q=(document.getElementById('searchQuery')?.value||'').trim().toLowerCase();
   const sort=document.getElementById('sortMode')?.value||'newest';
-  let list=DATA.records.filter(r=>(!fu||r.uang===fu)&&(!fp||r.project===fp));
+  let list=DATA.records.filter(r=>(!fu||r.uang===fu)&&(!fp||r.project===fp)&&matchesSearch_(r,q));
   const cmp={newest:(a,b)=>(b.createdAt||0)-(a.createdAt||0),oldest:(a,b)=>(a.createdAt||0)-(b.createdAt||0),project_az:(a,b)=>(a.project||'').localeCompare(b.project||'','id'),project_za:(a,b)=>(b.project||'').localeCompare(a.project||'','id'),amount_desc:(a,b)=>b.total-a.total,amount_asc:(a,b)=>a.total-b.total}[sort];
   if(cmp)list.sort(cmp);
 
@@ -832,7 +844,8 @@ function renderStats(filteredList=null){
 }
 function renderBoard(){
   const fu=document.getElementById('filterUang').value,fp=document.getElementById('filterProject').value,sort=document.getElementById('sortMode').value;
-  let list=DATA.records.filter(r=>(!fu||r.uang===fu)&&(!fp||r.project===fp));
+  const q=(document.getElementById('searchQuery')?.value||'').trim().toLowerCase();
+  let list=DATA.records.filter(r=>(!fu||r.uang===fu)&&(!fp||r.project===fp)&&matchesSearch_(r,q));
   renderStats(list);
   const cmp={newest:(a,b)=>(b.createdAt||0)-(a.createdAt||0),oldest:(a,b)=>(a.createdAt||0)-(b.createdAt||0),project_az:(a,b)=>(a.project||'').localeCompare(b.project||'','id'),project_za:(a,b)=>(b.project||'').localeCompare(a.project||'','id'),amount_desc:(a,b)=>b.total-a.total,amount_asc:(a,b)=>a.total-b.total}[sort];
   if(cmp)list.sort(cmp);document.getElementById('boardCount').textContent=list.length?` (${list.length})`:'';
@@ -864,6 +877,50 @@ const DASH_COLORS=['#2f7355','#c15a4a','#2f7373','#b98900','#7a5cc9','#c94f8f','
 function monthLabel_(ym){
   const [y,m]=ym.split('-');
   return new Date(Number(y),Number(m)-1,1).toLocaleDateString('id-ID',{month:'short',year:'2-digit'});
+}
+function renderCrossProjectPending(){
+  const el=document.getElementById('crossProjectPending');
+  if(!el)return;
+
+  if(!DATA.mainAccount){
+    el.innerHTML='<div class="dash-empty">⚠ Rekening utama belum diatur. Buka Papan Nota → "⭐ Atur Rekening Utama" dulu.</div>';
+    return;
+  }
+
+  const pending=DATA.records.filter(r=>r.uang!==DATA.mainAccount&&!r.reimbursed);
+  if(!pending.length){
+    el.innerHTML='<div class="dash-empty">🎉 Semua nota di semua project sudah direimburse.</div>';
+    return;
+  }
+
+  // Kelompokkan per project + per sumber uang (siapa yang perlu direimburse)
+  const grouped={};
+  pending.forEach(r=>{
+    const key=r.project+'|||'+r.uang;
+    grouped[key]=grouped[key]||{project:r.project,uang:r.uang,total:0,count:0};
+    grouped[key].total+=Number(r.total||0);
+    grouped[key].count++;
+  });
+  const rows=Object.values(grouped).sort((a,b)=>b.total-a.total);
+  const grandTotal=rows.reduce((s,r)=>s+r.total,0);
+
+  el.innerHTML=`
+    <div class="stats" style="margin-bottom:16px">
+      <div class="stat-card" style="min-width:230px;border-color:#f0d9a8;background:#fff8ec">
+        <div class="label" style="color:#8a6210">Total Belum Direimburse (Semua Project)</div>
+        <div class="val" style="color:#8a6210">${fmtRp(grandTotal)}</div>
+      </div>
+      <div class="stat-card"><div class="label">Jumlah Nota Pending</div><div class="val">${pending.length}</div></div>
+      <div class="stat-card"><div class="label">Project Terdampak</div><div class="val">${new Set(rows.map(r=>r.project)).size}</div></div>
+    </div>
+    <table class="cross-table">
+      <thead><tr><th>Project</th><th>Pakai Uang</th><th style="text-align:right">Jumlah Nota</th><th style="text-align:right">Total Belum Direimburse</th></tr></thead>
+      <tbody>
+        ${rows.map(r=>`<tr><td>${escapeHtml(r.project)}</td><td>${escapeHtml(r.uang)}</td><td class="amt">${r.count}</td><td class="amt">${fmtRp(r.total)}</td></tr>`).join('')}
+        <tr class="total-row"><td colspan="3">Total</td><td class="amt">${fmtRp(grandTotal)}</td></tr>
+      </tbody>
+    </table>
+  `;
 }
 function renderProjectDashboard(){
   const sel=document.getElementById('dashProjectSelect');
